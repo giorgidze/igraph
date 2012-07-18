@@ -43,7 +43,7 @@ data Graph d a = Graph { graphNodeNumber        :: !(Int)
                        , graphForeignPtr        :: !(Maybe (ForeignPtr Void))
                        }
 
--- | Graph class. Minimal definition: @data Edge d a@ with `Hasheable' and `Eq'
+-- | Graph class. Minimal definition: @data Edge d a@ with `Hashable' and `Eq'
 -- instances, `toEdge', `edgeFrom', `edgeTo', `isDirected'
 class (Eq a, Hashable a, Eq (Edge d a), Hashable (Edge d a)) => Gr d a where
 
