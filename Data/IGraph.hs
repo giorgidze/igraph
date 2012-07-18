@@ -1,6 +1,7 @@
 {-# LANGUAGE EmptyDataDecls #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeFamilies #-}
 -- {-# LANGUAGE  ForeignFunctionInterface #-}
 
@@ -22,7 +23,7 @@ module Data.IGraph  where -- ( Graph
 --                     , shortestPathsIn
 --                     ) where
 
-import Data.HashMap.Strict (HashMap,(!))
+import Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as Map
 
 import Data.HashSet (HashSet)
@@ -34,9 +35,6 @@ import Foreign.ForeignPtr
 
 data Void
 
-data U
-data D
-
 data Graph d a = Graph { graphNodeNumber        :: !(Int)
                        , graphEdgeNumber        :: !(Int)
                        , graphIdToNode          :: !(HashMap Int a)
@@ -45,38 +43,130 @@ data Graph d a = Graph { graphNodeNumber        :: !(Int)
                        , graphForeignPtr        :: !(Maybe (ForeignPtr Void))
                        }
 
-class (Eq a, Hashable a) => Gr d a where
+-- | Graph class. Minimal definition: @data Edge d a@ with `Hasheable' and `Eq'
+-- instances, `toEdge', `edgeFrom', `edgeTo', `isDirected'
+class (Eq a, Hashable a, Eq (Edge d a), Hashable (Edge d a)) => Gr d a where
+
+  -- | Edge definition should satisfy:
+  --
+  -- > let edge = toEdge a b
+  -- >  in edge == toEdge (edgeFrom edge) (edgeTo edge)
+  data Edge d a
+  toEdge   :: a -> a -> Edge d a
+  edgeFrom :: Edge d a -> a
+  edgeTo   :: Edge d a -> a
+
   empty :: Graph d a
   empty = Graph 0 0 Map.empty Map.empty Map.empty Nothing
 
   insertNode :: a -> Graph d a -> Graph d a
-  insertNode = undefined
+  insertNode n g = g { graphNodeNumber = i
+                     , graphIdToNode   = Map.insert i n (graphIdToNode g)
+                     , graphNodeToId   = Map.insert n i (graphNodeToId g)
+                     , graphForeignPtr = Nothing
+                     }
+   where
+    i = graphNodeNumber g + 1
 
   deleteNode :: a -> Graph d a -> Graph d a
-  insertEdge :: a -> a -> Graph d a -> Graph d a
-  deleteEdge :: a -> a -> Graph d a -> Graph d a
-  isDirected :: Graph d a -> Bool
+  deleteNode n g =
+    case Map.lookup n (graphNodeToId g) of
+         Just i  -> g { graphNodeNumber = graphNodeNumber g - 1
+                      , graphIdToNode   = Map.delete i (graphIdToNode g)
+                      , graphNodeToId   = Map.delete n (graphNodeToId g)
+                      , graphEdges      = Map.map (Set.delete i) $ Map.delete i (graphEdges g)
+                      , graphForeignPtr = Nothing
+                      }
+         Nothing -> g -- node not in graph
+
+  insertEdge :: Edge d a -> Graph d a -> Graph d a
+  insertEdge e g =
+    case (Map.lookup f (graphNodeToId g), Map.lookup t (graphNodeToId g)) of
+         (Just fi, Just ti) -> g { graphEdgeNumber = graphEdgeNumber g + 1
+                                 , graphEdges      = insertEdge' fi ti (isDirected g) (graphEdges g)
+                                 , graphForeignPtr = Nothing
+                                 }
+         _                  -> g -- not both nodes in graph
+   where
+    (f,t) = (edgeFrom e, edgeTo e)
+    insertEdge' f' t' False = insertEdge' t' f' True
+                            . insertEdge' f' t' True
+    insertEdge' f' t' True  = Map.insertWith Set.union f' (Set.singleton t')
+
+  deleteEdge :: Edge d a -> Graph d a -> Graph d a
+  deleteEdge e g =
+    case (Map.lookup f (graphNodeToId g), Map.lookup t (graphNodeToId g)) of
+         (Just fi, Just ti) -> g { graphEdgeNumber = graphEdgeNumber g - 1
+                                 , graphEdges      = deleteEdge' fi ti (isDirected g) (graphEdges g)
+                                 , graphForeignPtr = Nothing
+                                 }
+         _                  -> g -- not both nodes in graph
+   where
+    (f,t) = (edgeFrom e, edgeTo e)
+    deleteEdge' f' t' False = deleteEdge' t' f' True
+                            . deleteEdge' f' t' True
+    deleteEdge' f' t' True  = Map.adjust (Set.delete t') f'
 
   nodes :: Graph d a -> HashSet a
   nodes = Set.fromList . Map.keys . graphNodeToId 
 
-  edges :: Graph d a -> HashSet (a,a)
-  edges = undefined
+  edges :: Graph d a -> HashSet (Edge d a)
+  edges g = Map.foldrWithKey (\f ts es -> Set.union (Set.map (mkEdge f) ts) es) Set.empty (graphEdges g)
+   where
+    mkEdge f t
+      | Just fn <- Map.lookup f (graphIdToNode g)
+      , Just tn <- Map.lookup t (graphIdToNode g)
+      = toEdge fn tn
+      | otherwise
+      = error "Error in `edges': Graph node/ID mismatch."
 
-  neighbours        :: a -> Graph d a -> HashSet a
-  neighbours = undefined
-  
-instance (Eq a, Hashable a) => Gr U  a where
-  deleteNode = undefined
-  insertEdge = undefined
-  deleteEdge = undefined
+  neighbours :: a -> Graph d a -> HashSet a
+  neighbours n g
+    | Just i <- Map.lookup n (graphNodeToId g)
+    = maybe Set.empty (Set.map mkNode) $ Map.lookup i (graphEdges g)
+    | otherwise
+    = Set.empty
+   where
+    mkNode i | Just n' <- Map.lookup i (graphIdToNode g) = n'
+             | otherwise
+             = error "Error in `neighbours': Graph node/ID mismatch."
+
+  isDirected :: Graph d a -> Bool
+
+-- | Undirected graph
+data U
+
+instance (Eq a, Hashable a) => Gr U a where
   isDirected _ = False
+  data Edge U a = U_Edge a a
+  toEdge = U_Edge
+  edgeFrom (U_Edge a _) = a
+  edgeTo   (U_Edge _ b) = b
+
+instance Eq a => Eq (Edge U a) where
+  (U_Edge a b) == (U_Edge c d) = (a,b) == (c,d) || (a,b) == (d,c)
+
+instance Hashable a => Hashable (Edge U a) where
+  hash (U_Edge a b) = hash (a,b) + hash (b,a) -- to make sure (a,b) receives the same hash as (b,a)
+
+instance Show a => Show (Edge U a) where
+  show (U_Edge a b) = "Edge U {" ++ show a ++ " <-> " ++ show b ++ "}"
+
+-- | Directed graph
+data D
 
 instance (Eq a, Hashable a) => Gr D a where
-  deleteNode = undefined
-  insertEdge = undefined
-  deleteEdge = undefined
   isDirected _ = True
+  data Edge D a = D_Edge a a deriving Eq
+  toEdge = D_Edge
+  edgeFrom (D_Edge a _) = a
+  edgeTo   (D_Edge _ b) = b
+
+instance Hashable a => Hashable (Edge D a) where
+  hash (D_Edge a b) = hash (a,b)
+
+instance Show a => Show (Edge D a) where
+  show (D_Edge a b) = "Edge D {" ++ show a ++ " -> " ++ show b ++ "}"
 
 -- import Data.List
 
