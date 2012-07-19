@@ -1,5 +1,5 @@
 {-# LANGUAGE MultiParamTypeClasses, FlexibleContexts, FlexibleInstances,
-             TypeFamilies, GADTs
+             TypeFamilies, GADTs, EmptyDataDecls
              #-}
 
 module Data.IGraph.Types where
@@ -8,9 +8,22 @@ import Data.Hashable
 import Data.HashMap.Strict (HashMap)
 import Data.HashSet (HashSet)
 
+import Foreign.Ptr
 import Foreign.ForeignPtr
 
+
+--------------------------------------------------------------------------------
+-- C stuff
+
 data Void
+
+type GraphPtr     = Ptr Void
+type VectorPtr    = Ptr Void
+type VectorPtrPtr = Ptr Void
+
+
+--------------------------------------------------------------------------------
+-- Graph representation
 
 -- | The internal graph representation wrapped into a GADT to carry around the
 -- @Gr d a@ class constraint.
@@ -18,8 +31,8 @@ data Graph d a where
   G :: Gr d a => G d a -> Graph d a
 
 -- | The internal graph representation.
-data G d a = Graph { graphNodeNumber        :: !(Int)
-                   , graphEdgeNumber        :: !(Int)
+data G d a = Graph { -- graphNodeNumber        :: !(Int)
+                     graphEdgeNumber        :: !(Int)
                    , graphIdToNode          :: !(HashMap Int a)
                    , graphNodeToId          :: !(HashMap a Int)
                    , graphEdges             :: !(HashMap Int (HashSet Int))
