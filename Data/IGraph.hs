@@ -6,7 +6,17 @@
 {-# LANGUAGE GADTs #-}
 -- {-# LANGUAGE  ForeignFunctionInterface #-}
 
-module Data.IGraph  where -- ( Graph
+module Data.IGraph
+  ( Graph (..), G
+  , Gr (..)
+  , emptyGraph
+    -- * Graph modification
+  , insertNode, deleteNode
+  , insertEdge, deleteEdge
+    -- * Graph information
+  , nodes, edges, neighbours
+  ) where
+--                     ( Graph
 --                     , make
 --                     , makeFromFile
 --                     , edges
@@ -36,6 +46,12 @@ import Foreign.ForeignPtr
 
 data Void
 
+-- | The internal graph representation wrapped into a GADT to carry around the
+-- @Gr d a@ class constraint.
+data Graph d a where
+  G :: Gr d a => G d a -> Graph d a
+
+-- | The internal graph representation.
 data G d a = Graph { graphNodeNumber        :: !(Int)
                    , graphEdgeNumber        :: !(Int)
                    , graphIdToNode          :: !(HashMap Int a)
@@ -43,9 +59,6 @@ data G d a = Graph { graphNodeNumber        :: !(Int)
                    , graphEdges             :: !(HashMap Int (HashSet Int))
                    , graphForeignPtr        :: !(Maybe (ForeignPtr Void))
                    }
-
-data Graph d a where
-  G :: Gr d a => G d a -> Graph d a
 
 -- | Graph class. Minimal definition: @data Edge d a@ with `Hashable' and `Eq'
 -- instances, `toEdge', `edgeFrom', `edgeTo', `isDirected'
@@ -97,8 +110,8 @@ instance Show a => Show (Edge D a) where
   show (D_Edge a b) = "Edge D {" ++ show a ++ " -> " ++ show b ++ "}"
 
 
-empty :: Gr d a => Graph d a
-empty = G $ Graph 0 0 Map.empty Map.empty Map.empty Nothing
+emptyGraph :: Gr d a => Graph d a
+emptyGraph = G $ Graph 0 0 Map.empty Map.empty Map.empty Nothing
 
 
 insertNode :: a -> Graph d a -> Graph d a
