@@ -1,124 +1,17 @@
-{-# LANGUAGE EmptyDataDecls #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE GADTs #-}
--- {-# LANGUAGE  ForeignFunctionInterface #-}
-
 module Data.IGraph
   ( Graph (..), G, Gr (..), D, U
     -- * Construction
   , emptyGraph, fromList
-    -- ** Nodes
-  , insertNode, deleteNode
-    -- ** Edges
-  , insertEdge, deleteEdge
+  , insertEdge, deleteEdge, deleteNode
     -- * Query
   , null, member, nodes, edges, neighbours
   ) where
 
-import qualified Data.HashMap.Strict as Map
-
-import Data.HashSet (HashSet)
-import qualified Data.HashSet as Set
-
+import Data.IGraph.Basics
+import Data.IGraph.Internal
 import Data.IGraph.Types
 
-emptyGraph :: Gr d a => Graph d a
-emptyGraph = G $ Graph 0 0 Map.empty Map.empty Map.empty Nothing
-
--- | Create a graph from list. If both nodes of a touple are equal a new node is
--- created, but no new edge. Otherwise the edge @\\(a,b) -> toEdge a b@
--- and both nodes (if not already existent in the graph) are created.
---
--- > fromList [(0,0)]        == insertNode 0 emptyGraph
--- > fromList [(0,1)]        == insertEdge (toEdge 0 1) (insertNode 0 (insertNode 1 emptyGraph))
--- > fromList [(0,0), (0,1)] == insertEdge (toEdge 0 1) (insertNode 0 (insertNode 1 emptyGraph))
-fromList :: Gr d a => [(a,a)] -> Graph d a
-fromList = foldr (\(a,b) -> insertEdge (toEdge a b) . insertNode a . insertNode b)
-                 emptyGraph
-
-
-member :: a -> Graph d a -> Bool
-member a (G g) = a `Map.member` graphNodeToId g
-
-insertNode :: a -> Graph d a -> Graph d a
-insertNode n (G g)
-  | n `member` (G g) = G g -- node already in g
-  | otherwise = G $
-    g { graphNodeNumber = i
-      , graphIdToNode   = Map.insert i n (graphIdToNode g)
-      , graphNodeToId   = Map.insert n i (graphNodeToId g)
-      , graphForeignPtr = Nothing
-      }
- where
-  i = graphNodeNumber g + 1
-
-deleteNode :: a -> Graph d a -> Graph d a
-deleteNode n (G g) = G $
-  case Map.lookup n (graphNodeToId g) of
-       Just i  -> g { graphNodeNumber = graphNodeNumber g - 1
-                    , graphIdToNode   = Map.delete i (graphIdToNode g)
-                    , graphNodeToId   = Map.delete n (graphNodeToId g)
-                    , graphEdges      = Map.map (Set.delete i) $ Map.delete i (graphEdges g)
-                    , graphForeignPtr = Nothing
-                    }
-       Nothing -> g -- node not in graph
-
-insertEdge :: Edge d a -> Graph d a -> Graph d a
-insertEdge e (G g)
-  | e `Set.member` edges (G g) || (edgeFrom e == edgeTo e) = G g -- edge already in g or invalid edge
-  | otherwise = G $
-    case (Map.lookup f (graphNodeToId g), Map.lookup t (graphNodeToId g)) of
-         (Just fi, Just ti) -> g { graphEdgeNumber = graphEdgeNumber g + 1
-                                 , graphEdges      = insertEdge' fi ti (isDirected (G g)) (graphEdges g)
-                                 , graphForeignPtr = Nothing
-                                 }
-         _                  -> g -- not both nodes in graph
- where
-  (f,t) = (edgeFrom e, edgeTo e)
-  insertEdge' f' t' False = insertEdge' t' f' True
-                          . insertEdge' f' t' True
-  insertEdge' f' t' True  = Map.insertWith Set.union f' (Set.singleton t')
-
-deleteEdge :: Edge d a -> Graph d a -> Graph d a
-deleteEdge e (G g) = G $
-  case (Map.lookup f (graphNodeToId g), Map.lookup t (graphNodeToId g)) of
-       (Just fi, Just ti) -> g { graphEdgeNumber = graphEdgeNumber g - 1
-                               , graphEdges      = deleteEdge' fi ti (isDirected (G g)) (graphEdges g)
-                               , graphForeignPtr = Nothing
-                               }
-       _                  -> g -- not both nodes in graph
- where
-  (f,t) = (edgeFrom e, edgeTo e)
-  deleteEdge' f' t' False = deleteEdge' t' f' True
-                          . deleteEdge' f' t' True
-  deleteEdge' f' t' True  = Map.adjust (Set.delete t') f'
-
-nodes :: Graph d a -> HashSet a
-nodes (G g) = Set.fromList . Map.keys $ graphNodeToId g
-
-edges :: Graph d a -> HashSet (Edge d a)
-edges (G g) = Map.foldrWithKey (\f ts es -> Set.union (Set.map (mkEdge f) ts) es) Set.empty (graphEdges g)
- where
-  mkEdge f t
-    | Just fn <- Map.lookup f (graphIdToNode g)
-    , Just tn <- Map.lookup t (graphIdToNode g)
-    = toEdge fn tn
-    | otherwise
-    = error "Error in `edges': Graph node/ID mismatch."
-
-neighbours :: a -> Graph d a -> HashSet a
-neighbours n (G g)
-  | Just i <- Map.lookup n (graphNodeToId g)
-  = maybe Set.empty (Set.map mkNode) $ Map.lookup i (graphEdges g)
-  | otherwise
-  = Set.empty
- where
-  mkNode i | Just n' <- Map.lookup i (graphIdToNode g) = n'
-           | otherwise
-           = error "Error in `neighbours': Graph node/ID mismatch."
+import Foreign.ForeignPtr
 
 -- makeFromFile :: FilePath -> IO (Graph d a)
 -- makeFromFile fp = do
@@ -132,32 +25,15 @@ neighbours n (G g)
 -- 
 --   return $! make $ map func $ map (BS.words) (BS.lines bs)
 
--- vectorToList :: VectorPtr -> IO [Double]
--- vectorToList vector = do
---   len <- c_igraph_vector_length vector
---   let go :: [Double] -> CLong -> IO [Double]
---       go acc 0 = return acc
---       go acc i = do e <- c_igraph_vector_get vector (i - 1)
---                     go (realToFrac e : acc) (i - 1)
---   go [] len
--- 
--- vectorPtrToList :: VectorPtrPtr -> IO [[Double]]
--- vectorPtrToList vectorPtr = do
---   len <- c_igraph_vector_ptr_length vectorPtr
---   let go :: [[Double]] -> CLong -> IO [[Double]]
---       go acc 0 = return acc
---       go acc i = do e <- c_igraph_vector_ptr_get vectorPtr (i - 1)
---                     v <- vectorToList e
---                     go (v : acc) (i - 1)
---   go [] len
--- 
--- betweennessNodes :: Graph a -> [(Node,Double)]
--- betweennessNodes gr = unsafePerformIO $ withForeignPtr (graphForeignPtr gr) $ \grPtr -> do
---   vector <- c_igraph_betweenness grPtr
---   list   <- vectorToList vector
---   c_igraph_vector_destroy vector
---   return (zip [0 .. ] list)
--- 
+{-
+betweennessNodes :: Graph d a -> [(Node,Double)]
+betweennessNodes gr = unsafePerformIO $ withForeignPtr (graphForeignPtr gr) $ \grPtr -> do
+  vector <- c_igraph_betweenness grPtr
+  list   <- vectorToList vector
+  c_igraph_vector_destroy vector
+  return (zip [0 .. ] list)
+-}
+
 -- betweenness :: Graph a -> [(a,Double)]
 -- betweenness gr = [ ((graphNodeToLabel gr) ! node,s) | (node,s) <- betweennessNodes gr ]
 -- 

@@ -15,5 +15,11 @@ Library
   CC-options:         -Wall -O3
   Build-depends:      base >= 4.3.1.0, bytestring, unordered-containers, hashable
   Extra-Libraries:    igraph
-  C-Sources:          igraph.c
-  Exposed-modules:    Data.IGraph
+  C-Sources:
+    igraph.c
+  Exposed-modules:
+    Data.IGraph
+  Other-modules:
+    Data.IGraph.Basics
+    Data.IGraph.Internal
+    Data.IGraph.Types
