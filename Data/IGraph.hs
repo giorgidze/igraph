@@ -7,8 +7,7 @@
 -- {-# LANGUAGE  ForeignFunctionInterface #-}
 
 module Data.IGraph
-  ( Graph (..), G
-  , Gr (..)
+  ( Graph (..), G, Gr (..), D, U
   , emptyGraph
     -- * Graph modification
   , insertNode, deleteNode
@@ -16,23 +15,6 @@ module Data.IGraph
     -- * Graph information
   , nodes, edges, neighbours
   ) where
---                     ( Graph
---                     , make
---                     , makeFromFile
---                     , edges
---                     , labels
---                     , nodeNumber
---                     , edgeNumber
---                     , member
---                     , betweenness
---                     , eigenvectorCentrality
---                     , cluster
---                     , closenessIn
---                     , closenessIns
---                     , closenessOut
---                     , closenessOuts
---                     , shortestPathsIn
---                     ) where
 
 import Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as Map
@@ -64,10 +46,6 @@ data G d a = Graph { graphNodeNumber        :: !(Int)
 -- instances, `toEdge', `edgeFrom', `edgeTo', `isDirected'
 class (Eq a, Hashable a, Eq (Edge d a), Hashable (Edge d a)) => Gr d a where
 
-  -- | Edge definition should satisfy:
-  --
-  -- > let edge = toEdge a b
-  -- >  in edge == toEdge (edgeFrom edge) (edgeTo edge)
   data Edge d a
   toEdge     :: a -> a -> Edge d a
   edgeFrom   :: Edge d a -> a
