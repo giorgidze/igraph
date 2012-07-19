@@ -8,97 +8,50 @@
 
 module Data.IGraph
   ( Graph (..), G, Gr (..), D, U
-  , emptyGraph
-    -- * Graph modification
+    -- * Construction
+  , emptyGraph, fromList
+    -- ** Nodes
   , insertNode, deleteNode
+    -- ** Edges
   , insertEdge, deleteEdge
-    -- * Graph information
-  , nodes, edges, neighbours
+    -- * Query
+  , null, member, nodes, edges, neighbours
   ) where
 
-import Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as Map
 
 import Data.HashSet (HashSet)
 import qualified Data.HashSet as Set
 
-import Data.Hashable
-
-import Foreign.ForeignPtr
-
-data Void
-
--- | The internal graph representation wrapped into a GADT to carry around the
--- @Gr d a@ class constraint.
-data Graph d a where
-  G :: Gr d a => G d a -> Graph d a
-
--- | The internal graph representation.
-data G d a = Graph { graphNodeNumber        :: !(Int)
-                   , graphEdgeNumber        :: !(Int)
-                   , graphIdToNode          :: !(HashMap Int a)
-                   , graphNodeToId          :: !(HashMap a Int)
-                   , graphEdges             :: !(HashMap Int (HashSet Int))
-                   , graphForeignPtr        :: !(Maybe (ForeignPtr Void))
-                   }
-
--- | Graph class. Minimal definition: @data Edge d a@ with `Hashable' and `Eq'
--- instances, `toEdge', `edgeFrom', `edgeTo', `isDirected'
-class (Eq a, Hashable a, Eq (Edge d a), Hashable (Edge d a)) => Gr d a where
-
-  data Edge d a
-  toEdge     :: a -> a -> Edge d a
-  edgeFrom   :: Edge d a -> a
-  edgeTo     :: Edge d a -> a
-  isDirected :: Graph d a -> Bool
-
--- | Undirected graph
-data U
-
-instance (Eq a, Hashable a) => Gr U a where
-  isDirected _ = False
-  data Edge U a = U_Edge a a
-  toEdge = U_Edge
-  edgeFrom (U_Edge a _) = a
-  edgeTo   (U_Edge _ b) = b
-
-instance Eq a => Eq (Edge U a) where
-  (U_Edge a b) == (U_Edge c d) = (a,b) == (c,d) || (a,b) == (d,c)
-
-instance Hashable a => Hashable (Edge U a) where
-  hash (U_Edge a b) = hash (a,b) + hash (b,a) -- to make sure (a,b) receives the same hash as (b,a)
-
-instance Show a => Show (Edge U a) where
-  show (U_Edge a b) = "Edge U {" ++ show a ++ " <-> " ++ show b ++ "}"
-
--- | Directed graph
-data D
-
-instance (Eq a, Hashable a) => Gr D a where
-  isDirected _ = True
-  data Edge D a = D_Edge a a deriving Eq
-  toEdge = D_Edge
-  edgeFrom (D_Edge a _) = a
-  edgeTo   (D_Edge _ b) = b
-
-instance Hashable a => Hashable (Edge D a) where
-  hash (D_Edge a b) = hash (a,b)
-
-instance Show a => Show (Edge D a) where
-  show (D_Edge a b) = "Edge D {" ++ show a ++ " -> " ++ show b ++ "}"
-
+import Data.IGraph.Types
 
 emptyGraph :: Gr d a => Graph d a
 emptyGraph = G $ Graph 0 0 Map.empty Map.empty Map.empty Nothing
 
+-- | Create a graph from list. If both nodes of a touple are equal a new node is
+-- created, but no new edge. Otherwise the edge @\\(a,b) -> toEdge a b@
+-- and both nodes (if not already existent in the graph) are created.
+--
+-- > fromList [(0,0)]        == insertNode 0 emptyGraph
+-- > fromList [(0,1)]        == insertEdge (toEdge 0 1) (insertNode 0 (insertNode 1 emptyGraph))
+-- > fromList [(0,0), (0,1)] == insertEdge (toEdge 0 1) (insertNode 0 (insertNode 1 emptyGraph))
+fromList :: Gr d a => [(a,a)] -> Graph d a
+fromList = foldr (\(a,b) -> insertEdge (toEdge a b) . insertNode a . insertNode b)
+                 emptyGraph
+
+
+member :: a -> Graph d a -> Bool
+member a (G g) = a `Map.member` graphNodeToId g
 
 insertNode :: a -> Graph d a -> Graph d a
-insertNode n (G g) = G $
-  g { graphNodeNumber = i
-    , graphIdToNode   = Map.insert i n (graphIdToNode g)
-    , graphNodeToId   = Map.insert n i (graphNodeToId g)
-    , graphForeignPtr = Nothing
-    }
+insertNode n (G g)
+  | n `member` (G g) = G g -- node already in g
+  | otherwise = G $
+    g { graphNodeNumber = i
+      , graphIdToNode   = Map.insert i n (graphIdToNode g)
+      , graphNodeToId   = Map.insert n i (graphNodeToId g)
+      , graphForeignPtr = Nothing
+      }
  where
   i = graphNodeNumber g + 1
 
@@ -114,13 +67,15 @@ deleteNode n (G g) = G $
        Nothing -> g -- node not in graph
 
 insertEdge :: Edge d a -> Graph d a -> Graph d a
-insertEdge e (G g) = G $
-  case (Map.lookup f (graphNodeToId g), Map.lookup t (graphNodeToId g)) of
-       (Just fi, Just ti) -> g { graphEdgeNumber = graphEdgeNumber g + 1
-                               , graphEdges      = insertEdge' fi ti (isDirected (G g)) (graphEdges g)
-                               , graphForeignPtr = Nothing
-                               }
-       _                  -> g -- not both nodes in graph
+insertEdge e (G g)
+  | e `Set.member` edges (G g) || (edgeFrom e == edgeTo e) = G g -- edge already in g or invalid edge
+  | otherwise = G $
+    case (Map.lookup f (graphNodeToId g), Map.lookup t (graphNodeToId g)) of
+         (Just fi, Just ti) -> g { graphEdgeNumber = graphEdgeNumber g + 1
+                                 , graphEdges      = insertEdge' fi ti (isDirected (G g)) (graphEdges g)
+                                 , graphForeignPtr = Nothing
+                                 }
+         _                  -> g -- not both nodes in graph
  where
   (f,t) = (edgeFrom e, edgeTo e)
   insertEdge' f' t' False = insertEdge' t' f' True
@@ -165,63 +120,7 @@ neighbours n (G g)
            | otherwise
            = error "Error in `neighbours': Graph node/ID mismatch."
 
--- import Data.List
-
--- import qualified Data.ByteString.Char8 as BS
--- 
--- import Data.IORef
--- import Foreign.Ptr
--- import Foreign.ForeignPtr
--- import Foreign.C.Types
--- 
--- import System.IO.Unsafe (unsafePerformIO)
-
--- data Void
--- 
--- type GraphPtr     = Ptr Void
--- type VectorPtr    = Ptr Void
--- type VectorPtrPtr = Ptr Void
--- type Node         = Int
--- 
--- data Edge = Edge { edgeFr :: !Node
---                  , edgeTo :: !Node
---                  } deriving (Eq, Ord, Show)
--- 
--- instance Hashable Edge where
---   hash (Edge fr to) = hash (fr,to)
--- 
--- data Graph a = Graph { graphNodeNumber  :: !(Int)
---                      , graphEdgeNumber  :: !(Int)
---                      , graphEdges       :: !(HashSet Edge)
---                      , graphNodeToLabel :: !(HashMap Node a)
---                      , graphLabelToNode :: !(HashMap a Node)
---                      , graphForeignPtr  :: !(ForeignPtr Void)
---                      }
--- 
--- make :: (Eq a, Hashable a) => [(a,a)] -> Graph a
--- make edgesWithNodeLabels =
---   Graph { graphNodeNumber  = grNodeNumber
---         , graphEdgeNumber  = grEdgeNumber
---         , graphEdges       = grEdges
---         , graphNodeToLabel = grNodeToLabel
---         , graphLabelToNode = grLabelToNode
---         , graphForeignPtr  = grForeignPtr
---         }
---   where
---   es            = Set.fromList edgesWithNodeLabels
---   grEdgeNumber  = Set.size es
---   nodeLabels    = Set.union (Set.map fst es) (Set.map snd es)
---   grNodeNumber  = Set.size nodeLabels
---   grNodeToLabel = Map.fromList (zip [0 .. ] (Set.toList nodeLabels))
---   grLabelToNode = Map.fromList [ (l,n) | (n,l) <- Map.toList grNodeToLabel ]
---   grEdges       = Set.fromList [ Edge (grLabelToNode ! fr) (grLabelToNode ! to)
---                                | (fr,to) <- Set.toList es ]
---   grForeignPtr  = unsafePerformIO $ do  vector <- edgeSetToVector grEdges
---                                         grPtr <- c_igraph_create vector
---                                         c_igraph_vector_destroy vector
---                                         newForeignPtr c_igraph_destroy grPtr
--- 
--- makeFromFile :: FilePath -> IO (Graph Int)
+-- makeFromFile :: FilePath -> IO (Graph d a)
 -- makeFromFile fp = do
 --   bs <- BS.readFile fp
 -- 
@@ -232,38 +131,7 @@ neighbours n (G g)
 --       func _               = errorMessage
 -- 
 --   return $! make $ map func $ map (BS.words) (BS.lines bs)
--- 
--- nodeNumber :: Graph a -> Int
--- nodeNumber = graphNodeNumber
--- 
--- edgeNumber :: Graph a -> Int
--- edgeNumber = graphEdgeNumber
--- 
--- edges :: Graph a -> [(Node,Node)]
--- edges = map (\e -> (edgeFr e, edgeTo e)). Set.toList . graphEdges
--- 
--- labels :: Graph a -> [a]
--- labels = Map.keys . graphLabelToNode
--- 
--- member :: (Eq a, Hashable a) => Graph a -> a -> Bool
--- member gr a = Map.member a (graphLabelToNode gr)
--- 
--- listToVector :: (Integral a) => [a] -> IO VectorPtr
--- listToVector as = do
---   vector <- c_igraph_vector_create (2 * fromIntegral (length as))
---   sizeRef <- newIORef (0 :: Int)
---   forListM_ as $ \a -> do
---       size <- readIORef sizeRef
---       c_igraph_vector_set vector (fromIntegral size) (fromIntegral a)
---       modifyIORef sizeRef (+1)
---   return vector
--- 
--- edgeListToVector :: [Edge] -> IO VectorPtr
--- edgeListToVector = listToVector . concatMap (\ed -> [edgeFr ed,edgeTo ed])
--- 
--- edgeSetToVector :: HashSet Edge -> IO VectorPtr
--- edgeSetToVector = edgeListToVector . Set.toList
--- 
+
 -- vectorToList :: VectorPtr -> IO [Double]
 -- vectorToList vector = do
 --   len <- c_igraph_vector_length vector
