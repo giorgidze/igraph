@@ -44,14 +44,16 @@ foreign import ccall "c_igraph_vs_create"
 foreign import ccall "&c_igraph_vs_destroy"
   c_igraph_vs_destroy :: FunPtr (VsPtr -> IO ())
 
-newVs :: IO Vs
+newVs :: IO VsFPtr
 newVs = do
   vsp <- c_igraph_vs_create
-  fvp <- newForeignPtr c_igraph_vs_destroy vsp
-  return $ Vs fvp
+  newForeignPtr c_igraph_vs_destroy vsp
 
-withVs :: Vs -> (VsPtr -> IO a) -> IO a
-withVs = withForeignPtr . unVs
+withVs :: VsFPtr -> (VsPtr -> IO res) -> IO res
+withVs fvs = withForeignPtr fvs
+
+applyVs :: VsIdent a -> VertexSelector a -> IO VsFPtr
+applyVs f (Vs vs) = vs f
 
 
 --------------------------------------------------------------------------------

@@ -10,9 +10,9 @@ module Data.IGraph
 
     -- * Chapter 11. Vertex and Edge Selectors and Sequences, Iterators
     -- ** 11\.2 Vertex selector constructors
-  , Vs, vsAll, vsAdj, vsNonadj, vsNone, vs1, vsList, vsSeq
+  , VertexSelector, vsAll, vsAdj, vsNonadj, vsNone, vs1, vsList, vsSeq
     -- ** 11\.3. Generic vertex selector operations
-  , vsIsAll, vsSize
+  , vsIsAll , vsSize
 
     -- * Chapter 13\. Structural Properties of Graphs
     -- ** 13\.1 Basic properties
@@ -41,94 +41,85 @@ import System.IO.Unsafe
 foreign import ccall "igraph_vs_all"
   c_igraph_vs_all :: VsPtr -> IO CInt
 
-vsAll :: Vs
-vsAll = unsafePerformIO $ do
-  vs <- newVs
-  _e <- withVs vs $ \vsp ->
-    c_igraph_vs_all vsp
-  return vs
+vsAll :: VertexSelector a
+vsAll = Vs $ \_ -> do
+  fvs <- newVs
+  _e  <- withVs fvs c_igraph_vs_all
+  return fvs
 
 foreign import ccall "igraph_vs_adj"
   c_igraph_vs_adj :: VsPtr -> CInt -> CInt -> IO CInt
 
-vsAdj :: Graph d a -> a -> NeiMode -> Maybe Vs
-vsAdj g n m
-  | Just i <- nodeToId g n
-  = unsafePerformIO $ do
-    vs <- newVs
-    _e <- withVs vs $ \vsp ->
+vsAdj :: a -> NeiMode -> (VertexSelector a)
+vsAdj n m = Vs $ \ident -> do
+  fvs <- newVs
+  _e  <- onSuccessfulVsIdent fvs (ident n) $ \i ->
+    withVs fvs $ \vsp ->
       c_igraph_vs_adj vsp (fromIntegral i) (fromIntegral (fromEnum m))
-    return $ Just vs
-  | otherwise
-  = Nothing
+  return fvs
 
 foreign import ccall "igraph_vs_nonadj"
   c_igraph_vs_nonadj :: VsPtr -> CInt -> CInt -> IO CInt
 
-vsNonadj :: Graph d a -> a -> NeiMode -> Maybe Vs
-vsNonadj g n m
-  | Just i <- nodeToId g n
-  = unsafePerformIO $ do
-    vs <- newVs
-    _e <- withVs vs $ \vsp ->
+vsNonadj :: a -> NeiMode -> VertexSelector a
+vsNonadj n m = Vs $ \ident -> do
+  fvs <- newVs
+  _e  <- onSuccessfulVsIdent fvs (ident n) $ \i ->
+    withVs fvs $ \vsp ->
       c_igraph_vs_nonadj vsp (fromIntegral i) (fromIntegral (fromEnum m))
-    return $ Just vs
-  | otherwise
-  = Nothing
+  return fvs
 
 foreign import ccall "igraph_vs_none"
   c_igraph_vs_none :: VsPtr -> IO CInt
 
-vsNone :: Vs
-vsNone = unsafePerformIO $ do
+vsNone :: VertexSelector a
+vsNone = Vs $ \_ -> do
   vs <- newVs
-  _e <- withVs vs $ \vsp ->
-    c_igraph_vs_none vsp
+  _e <- withVs vs c_igraph_vs_none
   return vs
 
 foreign import ccall "igraph_vs_1"
   c_igraph_vs_1 :: VsPtr -> CInt -> IO CInt
 
-vs1 :: Graph d a -> a -> Maybe Vs
-vs1 g n
-  | Just i <- nodeToId g n
-  = unsafePerformIO $ do
-    vs <- newVs
-    _e <- withVs vs $ \vsp ->
-      c_igraph_vs_1 vsp (fromIntegral i)
-    return $ Just vs
-  | otherwise
-  = Nothing
+vs1 :: a -> VertexSelector a
+vs1 n = Vs $ \ident -> do
+  fvs <- newVs
+  _e <- onSuccessfulVsIdent fvs (ident n) $ \i ->
+    withVs fvs $ \vsp -> c_igraph_vs_1 vsp (fromIntegral i)
+  return fvs
 
 foreign import ccall "igraph_vs_vector"
   c_igraph_vs_vector :: VsPtr -> VectorPtr -> IO CInt
 
-vsList :: Graph d a -> [a] -> Maybe Vs
-vsList g l
-  | Just is <- sequence (map (nodeToId g) l)
-  = unsafePerformIO $ do
-    vs <- newVs
+vsList :: [a] -> VertexSelector a
+vsList l = Vs $ \ident -> do
+  fvs <- newVs
+  _e  <- onSuccessfulVsIdent fvs (sequence (map ident l)) $ \is -> do
     v  <- listToVector is
-    _e <- withVs vs $ \vsp -> withVector v $ \vp ->
+    withVs fvs $ \vsp -> withVector v $ \vp ->
       c_igraph_vs_vector vsp vp
-    return $ Just vs
-  | otherwise
-  = Nothing
+  return fvs
 
 foreign import ccall "igraph_vs_seq"
   c_igraph_vs_seq :: VsPtr -> CInt -> CInt -> IO CInt
 
-vsSeq :: Graph d a -> a -> a -> Maybe Vs
-vsSeq g f t
-  | Just fi <- nodeToId g f
-  , Just ti <- nodeToId g t
-  = unsafePerformIO $ do
-    vs <- newVs
-    _e <- withVs vs $ \vsp ->
+vsSeq :: a -> a -> VertexSelector a
+vsSeq f t = Vs $ \ident -> do
+  fvs <- newVs
+  _e  <- onSuccessfulVsIdent fvs (zipM (ident f) (ident t)) $ \(fi,ti) ->
+    withVs fvs $ \vsp ->
       c_igraph_vs_seq vsp (fromIntegral fi) (fromIntegral ti)
-    return $ Just vs
-  | otherwise
-  = Nothing
+  return fvs
+ where
+  zipM ma mb = do
+    a <- ma
+    b <- mb
+    return (a,b)
+
+onSuccessfulVsIdent :: VsFPtr -> Maybe a -> (a -> IO CInt) -> IO CInt
+onSuccessfulVsIdent fvs Nothing  _ = withVs fvs c_igraph_vs_none
+onSuccessfulVsIdent _   (Just a) f = f a
+
 
 
 --------------------------------------------------------------------------------
@@ -137,18 +128,20 @@ vsSeq g f t
 foreign import ccall "igraph_vs_is_all"
   c_igraph_vs_is_all :: VsPtr -> IO CInt
 
-vsIsAll :: Vs -> Bool
+vsIsAll :: VertexSelector a -> Bool
 vsIsAll vs = unsafePerformIO $ do
-  r <- withVs vs $ \vsp ->
+  fvs <- applyVs (const Nothing) vs
+  r <- withVs fvs $ \vsp ->
     c_igraph_vs_is_all vsp
   return $ r == 1
 
 foreign import ccall "igraph_vs_size"
   c_igraph_vs_size :: GraphPtr -> VsPtr -> Ptr CInt -> IO CInt
 
-vsSize :: Graph d a -> Vs -> Int
+vsSize :: Graph d a -> VertexSelector a -> Int
 vsSize g vs = unsafePerformIO $ alloca $ \rp -> do
-  _e <- withGraph_ g $ \gp -> withVs vs $ \vsp ->
+  fvs <- applyVs (nodeToId g) vs
+  _e <- withGraph_ g $ \gp -> withVs fvs $ \vsp ->
     c_igraph_vs_size gp vsp rp
   ci <- peek rp
   return $ fromIntegral ci
