@@ -13,13 +13,21 @@ Cabal-version:        >=1.2
 Library
   GHC-options:        -Wall -O3 -funbox-strict-fields 
   CC-options:         -Wall -O3
-  Build-depends:      base >= 4.3.1.0, bytestring, unordered-containers, hashable
-  Extra-Libraries:    igraph
+  Build-depends:
+    base >= 4.3.1.0,
+    bytestring,
+    unordered-containers,
+    hashable
+  Extra-Libraries:
+    igraph
   C-Sources:
     igraph.c
+  Build-Tools:
+    c2hs
   Exposed-modules:
     Data.IGraph
   Other-modules:
     Data.IGraph.Basics
     Data.IGraph.Internal
+    Data.IGraph.Internal.Constants
     Data.IGraph.Types
