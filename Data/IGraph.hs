@@ -16,9 +16,6 @@ module Data.IGraph
 
     -- ** 13\.4 Graph Components
   , isConnected, Connectedness(..)
-
-    -- * stupid, remove again
-  , vectorToList, listToVector, edgesToVector, vectorToEdges
   ) where
 
 import Data.IGraph.Basics
