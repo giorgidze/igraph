@@ -11,7 +11,7 @@ import qualified Data.HashMap.Strict as Map
 --import Data.HashSet (HashSet)
 import qualified Data.HashSet as Set
 
---import Data.List
+import Control.Monad
 import Data.IORef
 import Foreign.Ptr
 import Foreign.ForeignPtr
@@ -36,18 +36,43 @@ edgeIdToEdge g i
   es = edges g
 
 --------------------------------------------------------------------------------
--- Vector conversion
+-- Vertex selectors
+
+foreign import ccall "c_igraph_vs_create"
+  c_igraph_vs_create :: IO VsPtr
+
+foreign import ccall "&c_igraph_vs_destroy"
+  c_igraph_vs_destroy :: FunPtr (VsPtr -> IO ())
+
+newVs :: IO Vs
+newVs = do
+  vsp <- c_igraph_vs_create
+  fvp <- newForeignPtr c_igraph_vs_destroy vsp
+  return $ Vs fvp
+
+withVs :: Vs -> (VsPtr -> IO a) -> IO a
+withVs = withForeignPtr . unVs
+
+
+--------------------------------------------------------------------------------
+-- Vectors
+
+newVector :: Int -> IO Vector
+newVector s = do
+  vp  <- c_igraph_vector_create (fromIntegral s)
+  fvp <- newForeignPtr c_igraph_vector_destroy vp
+  return $ Vector fvp
 
 listToVector :: (Integral a) => [a] -> IO Vector
 listToVector as = do
-  vp <- c_igraph_vector_create (fromIntegral (length as))
-  sizeRef <- newIORef (0 :: Int)
-  forListM_ as $ \a -> do
+  v <- newVector (length as)
+  withVector v $ \vp -> do
+    sizeRef <- newIORef (0 :: Int)
+    forListM_ as $ \a -> do
       size <- readIORef sizeRef
       c_igraph_vector_set vp (fromIntegral size) (fromIntegral a)
       modifyIORef sizeRef (+1)
-  fvp <- newForeignPtr c_igraph_vector_destroy vp
-  return $ Vector fvp
+  return v
   
 vectorToList :: Vector -> IO [Double]
 vectorToList (Vector fvp) = withForeignPtr fvp $ \vp -> do
@@ -89,7 +114,65 @@ vectorToVertices g@(G _) v = do
 
 
 --------------------------------------------------------------------------------
+-- Matrices
+
+foreign import ccall "igraph_matrix_e"
+  c_igraph_matrix_get     :: MatrixPtr -> CLong -> CLong -> IO CDouble
+foreign import ccall "c_igraph_matrix_create"
+  c_igraph_matrix_create  :: CLong -> CLong -> IO MatrixPtr
+foreign import ccall "&c_igraph_matrix_destroy"
+  c_igraph_matrix_destroy :: FunPtr (MatrixPtr -> IO ())
+foreign import ccall "igraph_matrix_set"
+  c_igraph_matrix_set     :: MatrixPtr -> CLong -> CLong -> CDouble -> IO ()
+foreign import ccall "igraph_matrix_nrow"
+  c_igraph_matrix_nrow    :: MatrixPtr -> IO CLong
+foreign import ccall "igraph_matrix_ncol"
+  c_igraph_matrix_ncol    :: MatrixPtr -> IO CLong
+foreign import ccall "igraph_matrix_get_row"
+  c_igraph_matrix_get_row :: MatrixPtr -> VectorPtr -> CLong -> IO CInt
+
+newMatrix :: Int -> Int -> IO Matrix
+newMatrix nrow ncol = do
+  mp  <- c_igraph_matrix_create (fromIntegral nrow) (fromIntegral ncol)
+  fmp <- newForeignPtr c_igraph_matrix_destroy mp
+  return $ Matrix fmp
+
+getMatrixValue :: Matrix -> Int -> Int -> IO Double
+getMatrixValue (Matrix fmp) x y = withForeignPtr fmp $ \ mp -> do
+  cd <- c_igraph_matrix_get mp (fromIntegral x) (fromIntegral y)
+  return $ realToFrac cd
+
+listToMatrix :: Integral a => [[a]] -> IO Matrix
+listToMatrix l = do
+  m <- newMatrix nrow ncol
+  withMatrix m $ \mp ->
+    -- fill the matrix
+    forListM_ (zip [0..] l)     $ \(r,row) ->
+      forListM_ (zip [0..] row) $ \(c,val) ->
+        c_igraph_matrix_set mp r c (fromIntegral val)
+  return m
+ where
+  nrow = maximum (map length l)
+  ncol = length l
+
+matrixToList :: Matrix -> IO [[Double]]
+matrixToList m = withMatrix m $ \mp -> do
+  nrow <- c_igraph_matrix_nrow mp
+  ncol <- c_igraph_matrix_ncol mp
+  forM [0..nrow-1] $ \r -> do
+    v  <- newVector (fromIntegral ncol)
+    _e <-withVector v $ \vp ->
+      c_igraph_matrix_get_row mp vp r
+    vectorToList v
+    
+  
+
+
+--------------------------------------------------------------------------------
 -- Ptr stuff
+
+withMatrix :: Matrix -> (MatrixPtr -> IO a) -> IO a
+withMatrix (Matrix fmp) = withForeignPtr fmp
 
 withVector :: Vector -> (VectorPtr -> IO a) -> IO a
 withVector (Vector fvp) = withForeignPtr fvp

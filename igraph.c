@@ -66,6 +66,37 @@ void c_igraph_vector_ptr_destroy (igraph_vector_ptr_t* vector_ptr)
     return;
 }
 
+igraph_matrix_t* c_igraph_matrix_create (long int nrow, long int ncol)
+{
+    igraph_matrix_t* matrix = (igraph_matrix_t*) malloc (sizeof (igraph_matrix_t));
+    igraph_matrix_init(matrix, nrow, ncol);
+    igraph_matrix_null(matrix);
+    return matrix;
+}
+
+void c_igraph_matrix_destroy (igraph_matrix_t* matrix)
+{
+    if (matrix)
+        igraph_matrix_destroy(matrix);
+    free(matrix);
+    return;
+}
+
+igraph_vs_t* c_igraph_vs_create ()
+{
+    igraph_vs_t* vs = (igraph_vs_t*) malloc (sizeof (igraph_vs_t));
+    return vs;
+}
+
+void c_igraph_vs_destroy (igraph_vs_t* vs)
+{
+    if (vs)
+        igraph_vs_destroy(vs);
+    free(vs);
+    return;
+}
+
+/*
 
 igraph_vector_t* c_igraph_betweenness(const igraph_t* graph)
 {
@@ -115,3 +146,5 @@ igraph_vector_ptr_t* c_igraph_get_shortest_paths_in (const igraph_t* graph, int 
     igraph_get_shortest_paths(graph, result, NULL, vertex, igraph_vss_all(), IGRAPH_IN);
     return result;
 }
+
+*/

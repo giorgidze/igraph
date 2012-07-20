@@ -16,11 +16,16 @@ import Foreign.ForeignPtr
 -- C stuff
 
 type GraphPtr     = Ptr ()
+
 type VectorPtr    = Ptr ()
 type VectorPtrPtr = Ptr ()
-type VSPtr        = Ptr ()
-
 newtype Vector    = Vector { unVector :: ForeignPtr () }
+
+type MatrixPtr    = Ptr ()
+newtype Matrix    = Matrix { unMatrix :: ForeignPtr () }
+
+type VsPtr        = Ptr ()
+newtype Vs        = Vs { unVs :: ForeignPtr () }
 
 --------------------------------------------------------------------------------
 -- Graph representation
