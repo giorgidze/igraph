@@ -1,5 +1,5 @@
 {-# LANGUAGE MultiParamTypeClasses, FlexibleContexts, FlexibleInstances,
-             TypeFamilies, GADTs, EmptyDataDecls
+             TypeFamilies, GADTs, EmptyDataDecls, UndecidableInstances
              #-}
 
 module Data.IGraph.Types where
@@ -15,12 +15,12 @@ import Foreign.ForeignPtr
 --------------------------------------------------------------------------------
 -- C stuff
 
-data Void
+type GraphPtr     = Ptr ()
+type VectorPtr    = Ptr ()
+type VectorPtrPtr = Ptr ()
+type VSPtr        = Ptr ()
 
-type GraphPtr     = Ptr Void
-type VectorPtr    = Ptr Void
-type VectorPtrPtr = Ptr Void
-
+newtype Vector    = Vector { unVector :: ForeignPtr () }
 
 --------------------------------------------------------------------------------
 -- Graph representation
@@ -30,13 +30,19 @@ type VectorPtrPtr = Ptr Void
 data Graph d a where
   G :: Gr d a => G d a -> Graph d a
 
+instance (Show (Edge d a)) => Show (Graph d a) where
+  show (G g) = show (graphEdges g)
+
+instance (Eq (Edge d a)) => Eq (Graph d a) where
+  (G g1) == (G g2) = graphEdges g1 == graphEdges g2
+
 -- | The internal graph representation.
-data G d a = Graph { -- graphNodeNumber        :: !(Int)
-                     graphEdgeNumber        :: !(Int)
+data G d a = Graph { graphNodeNumber        :: !(Int)
+                   , graphEdgeNumber        :: !(Int)
                    , graphIdToNode          :: !(HashMap Int a)
                    , graphNodeToId          :: !(HashMap a Int)
-                   , graphEdges             :: !(HashMap Int (HashSet Int))
-                   , graphForeignPtr        :: !(Maybe (ForeignPtr Void))
+                   , graphEdges             :: !(HashSet (Edge d a))
+                   , graphForeignPtr        :: !(Maybe (ForeignPtr ()))
                    }
 
 -- | Graph class. Minimal definition: @data Edge d a@ with `Hashable' and `Eq'

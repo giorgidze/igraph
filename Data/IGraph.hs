@@ -1,126 +1,88 @@
+{-# LANGUAGE PatternGuards, ForeignFunctionInterface #-}
+
 module Data.IGraph
   ( Graph (..), G, Gr (..), D, U
     -- * Construction
   , emptyGraph, fromList
   , insertEdge, deleteEdge, deleteNode
     -- * Query
-  , null, member, nodes, edges, neighbours
+  , numberOfNodes, numberOfEdges, member, nodes, edges, neighbours
+
+    -- * Chapter 13\. Structural Properties of Graphs
+    -- ** 13\.1 Basic properties
+  , areConnected
+    -- ** 13\.2 Shortest Path Related Functions
+  , getShortestPath, NeiMode(..)
+
+    -- ** 13\.4 Graph Components
+  , isConnected, Connectedness(..)
+
+    -- * stupid, remove again
+  , vectorToList, listToVector, edgesToVector, vectorToEdges
   ) where
 
 import Data.IGraph.Basics
 import Data.IGraph.Internal
+import Data.IGraph.Internal.Constants
 import Data.IGraph.Types
 
-import Foreign.ForeignPtr
+import Foreign.C
+import Foreign.Ptr
+import Foreign.Marshal
+import Foreign.Storable
+import System.IO.Unsafe
 
--- makeFromFile :: FilePath -> IO (Graph d a)
--- makeFromFile fp = do
---   bs <- BS.readFile fp
--- 
---   let errorMessage = error ("Unable to import the graph file '" ++ fp ++ "'\n")
---   let func (frb : tob : _) = case (BS.readInt frb,BS.readInt tob) of
---                                (Just (fr,_),Just(to,_)) -> (fr,to)
---                                _                        -> errorMessage
---       func _               = errorMessage
--- 
---   return $! make $ map func $ map (BS.words) (BS.lines bs)
+--------------------------------------------------------------------------------
+-- 1. Basic properties
 
-{-
-betweennessNodes :: Graph d a -> [(Node,Double)]
-betweennessNodes gr = unsafePerformIO $ withForeignPtr (graphForeignPtr gr) $ \grPtr -> do
-  vector <- c_igraph_betweenness grPtr
-  list   <- vectorToList vector
-  c_igraph_vector_destroy vector
-  return (zip [0 .. ] list)
--}
+foreign import ccall "igraph_are_connected"
+  c_igraph_are_connected :: GraphPtr -> CInt -> CInt -> Ptr CInt -> IO CInt
 
--- betweenness :: Graph a -> [(a,Double)]
--- betweenness gr = [ ((graphNodeToLabel gr) ! node,s) | (node,s) <- betweennessNodes gr ]
--- 
--- eigenvectorCentralityNodes :: Graph a -> [(Node,Double)]
--- eigenvectorCentralityNodes gr = unsafePerformIO $ withForeignPtr (graphForeignPtr gr) $ \grPtr -> do
---   vector <- c_igraph_eigenvector_centrality grPtr
---   list   <- vectorToList vector
---   c_igraph_vector_destroy vector
---   return (zip [0 .. ] list)
--- 
--- eigenvectorCentrality :: Graph a -> [(a,Double)]
--- eigenvectorCentrality gr = [ ((graphNodeToLabel gr) ! node,s) | (node,s) <- eigenvectorCentralityNodes gr ]
--- 
--- clusterNodes :: Graph a -> [[Node]]
--- clusterNodes gr = unsafePerformIO $ withForeignPtr (graphForeignPtr gr) $ \grPtr -> do
---   vector <- c_igraph_clusters grPtr
---   list   <- vectorToList vector
---   c_igraph_vector_destroy vector
---   return $ [ [ n | (i,n) <- zip list [0 .. ], i == ci ] | ci <- nub list ]
--- 
--- cluster :: Graph a -> [[a]]
--- cluster gr = [ [ (graphNodeToLabel gr) ! node | node <- nodes ] | nodes <- clusterNodes gr ]
--- 
--- closenessInNode :: Graph a -> Node -> Double
--- closenessInNode gr nd = unsafePerformIO $ withForeignPtr (graphForeignPtr gr) $ \grPtr -> do
---   vector <- c_igraph_closeness_in grPtr (fromIntegral nd)
---   list   <- vectorToList vector
---   c_igraph_vector_destroy vector
---   return (head list)
--- 
--- closenessIn :: (Eq a, Hashable a) => Graph a -> a -> Double
--- closenessIn gr a = closenessInNode gr ((graphLabelToNode gr) ! a)
--- 
--- closenessIns :: (Eq a, Hashable a) => Graph a -> [a] -> [Double]
--- closenessIns gr = map (closenessIn gr)
--- 
--- closenessOutNode :: Graph a -> Node -> Double
--- closenessOutNode gr nd = unsafePerformIO $ withForeignPtr (graphForeignPtr gr) $ \grPtr -> do
---   vector <- c_igraph_closeness_out grPtr (fromIntegral nd)
---   list   <- vectorToList vector
---   c_igraph_vector_destroy vector
---   return (head list)
--- 
--- closenessOut :: (Eq a, Hashable a) => Graph a -> a -> Double
--- closenessOut gr a = closenessOutNode gr ((graphLabelToNode gr) ! a)
--- 
--- closenessOuts :: (Eq a, Hashable a) => Graph a -> [a] -> [Double]
--- closenessOuts gr = map (closenessOut gr)
--- 
--- shortestPathsInNode :: Graph a -> Node -> [[Node]]
--- shortestPathsInNode gr nd = unsafePerformIO $ withForeignPtr (graphForeignPtr gr) $ \grPtr -> do
---   vectorPtr <- c_igraph_get_shortest_paths_in grPtr (fromIntegral nd)
---   lists   <- vectorPtrToList vectorPtr
---   c_igraph_vector_ptr_destroy vectorPtr
---   return (map (map round) lists)
--- 
--- shortestPathsIn :: (Eq a, Hashable a) => Graph a -> a -> [[a]]
--- shortestPathsIn gr a = [ [ (graphNodeToLabel gr) ! n | n <- nodes ]
---                        | nodes <- shortestPathsInNode gr ((graphLabelToNode gr) ! a)
---                        , not (null nodes) ]
--- 
--- foreign import ccall "c_igraph_create"                    c_igraph_create                     :: VectorPtr -> IO GraphPtr
--- foreign import ccall "&c_igraph_destroy"                  c_igraph_destroy                    :: FunPtr (GraphPtr  -> IO ())
--- foreign import ccall "c_igraph_vector_create"             c_igraph_vector_create              :: CLong  -> IO VectorPtr
--- foreign import ccall "c_igraph_vector_destroy"            c_igraph_vector_destroy             :: VectorPtr -> IO ()
--- foreign import ccall "c_igraph_vector_ptr_destroy"        c_igraph_vector_ptr_destroy         :: VectorPtrPtr -> IO ()
--- foreign import ccall "igraph_vector_set"                  c_igraph_vector_set                 :: VectorPtr -> CLong -> CDouble -> IO ()
--- foreign import ccall "igraph_vector_e"                    c_igraph_vector_get                 :: VectorPtr -> CLong -> IO CDouble
--- foreign import ccall "igraph_vector_size"                 c_igraph_vector_length              :: VectorPtr -> IO CLong
--- foreign import ccall "igraph_vector_ptr_e"                c_igraph_vector_ptr_get             :: VectorPtrPtr -> CLong -> IO VectorPtr
--- foreign import ccall "igraph_vector_ptr_size"             c_igraph_vector_ptr_length          :: VectorPtrPtr -> IO CLong
--- foreign import ccall "c_igraph_betweenness"               c_igraph_betweenness                :: GraphPtr -> IO VectorPtr
--- foreign import ccall "c_igraph_closeness_in"              c_igraph_closeness_in               :: GraphPtr -> CInt -> IO VectorPtr
--- foreign import ccall "c_igraph_closeness_out"             c_igraph_closeness_out              :: GraphPtr -> CInt -> IO VectorPtr
--- foreign import ccall "c_igraph_get_shortest_paths_in"     c_igraph_get_shortest_paths_in      :: GraphPtr -> CInt -> IO VectorPtrPtr
--- foreign import ccall "c_igraph_eigenvector_centrality"    c_igraph_eigenvector_centrality     :: GraphPtr -> IO VectorPtr
--- foreign import ccall "c_igraph_clusters"                  c_igraph_clusters                   :: GraphPtr -> IO VectorPtr
--- 
--- -- Helper Functions
--- 
--- forListM_ :: [a] -> (a -> IO b) -> IO ()
--- forListM_ []       _ = return ()
--- forListM_ (a : as) f = (f a) >> (forListM_ as f)
--- 
--- -- forListM :: [a] -> (a -> IO b) -> IO [b]
--- -- forListM = go []
--- --   where
--- --   go :: [b] -> [a] -> (a -> IO b) -> IO [b]
--- --   go acc [] _       = return (reverse acc)
--- --   go acc (a : as) f = f a >>= \b -> go (b : acc) as f
+areConnected :: Graph d a -> a -> a -> Bool
+areConnected g@(G _) n1 n2
+  | Just i1 <- nodeToId g n1
+  , Just i2 <- nodeToId g n2
+  = unsafePerformIO $ withGraph_ g $ \gp -> alloca $ \bp -> do
+    e <- c_igraph_are_connected gp (fromIntegral i1) (fromIntegral i2) bp
+    if e == 0 then
+       peek bp >>= return . (== 1)
+     else
+       error $ "areConnected: igraph error " ++ show e
+  | otherwise = False
+
+--------------------------------------------------------------------------------
+-- 2. Shortest Path Related Functions
+
+--shortestPath :: Graph d a -> a -> a -> ?
+
+foreign import ccall "igraph_get_shortest_path"
+  c_igraph_get_shortest_path :: GraphPtr -> VectorPtr -> VectorPtr -> CInt -> CInt -> CInt -> IO CInt
+
+getShortestPath :: Graph d a -> a -> a -> NeiMode -> ([a],[Edge d a])
+getShortestPath g@(G _) n1 n2 m
+  | Just i1 <- nodeToId g n1
+  , Just i2 <- nodeToId g n2
+  = unsafePerformIO $ withGraph_ g $ \gp -> do
+    v1 <- listToVector ([] :: [Int])
+    v2 <- listToVector ([] :: [Int])
+    e <- withVector v1 $ \vp1 -> withVector v2 $ \vp2 ->
+         c_igraph_get_shortest_path gp vp1 vp2 (fromIntegral i1) (fromIntegral i2) (fromIntegral (fromEnum m))
+    if e == 0 then do
+       vert <- vectorToVertices g v1
+       edgs <- vectorToEdges    g v2
+       return ( vert, edgs )
+     else
+       error $ "getShortestPath: igraph error " ++ show e
+  | otherwise = error "getShortestPath: Invalid nodes"
+
+--------------------------------------------------------------------------------
+-- 4. Graph Components
+
+foreign import ccall "igraph_is_connected"
+  c_igraph_is_connected :: GraphPtr -> Ptr CInt -> CInt -> IO CInt
+
+isConnected :: Graph d a -> Connectedness -> Bool
+isConnected g@(G _) c = unsafePerformIO $ withGraph_ g $ \gp -> alloca $ \b -> do
+  _ <- c_igraph_is_connected gp b (fromIntegral $ fromEnum c)
+  r <- peek b
+  return $ r == 1

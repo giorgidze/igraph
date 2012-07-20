@@ -8,18 +8,30 @@ import qualified Data.HashMap.Strict as Map
 import Data.HashSet (HashSet)
 import qualified Data.HashSet as Set
 
+import Data.List
+
 import Data.IGraph.Types
 
 emptyGraph :: Gr d a => Graph d a
-emptyGraph = G $ Graph {- 0 -} 0 Map.empty Map.empty Map.empty Nothing
+emptyGraph = G $ Graph 0 0 Map.empty Map.empty Set.empty Nothing
 
 fromList :: Gr d a => [(a,a)] -> Graph d a
-fromList = foldr (\(a,b) -> insertEdge (toEdge a b)) -- . insertNode a . insertNode b)
-                 emptyGraph
+fromList = foldl' (\g (a,b) -> insertEdge (toEdge a b) g) emptyGraph
 
+numberOfNodes :: Graph d a -> Int
+numberOfNodes (G g) = graphNodeNumber g
+
+numberOfEdges :: Graph d a -> Int
+numberOfEdges (G g) = graphEdgeNumber g
 
 member :: a -> Graph d a -> Bool
 member a (G g) = a `Map.member` graphNodeToId g
+
+nodeToId :: Graph d a -> a -> Maybe Int
+nodeToId (G g) n = Map.lookup n (graphNodeToId g)
+
+idToNode :: Graph d a -> Int -> Maybe a
+idToNode (G g) i = Map.lookup i (graphIdToNode g)
 
 -- insertNode :: a -> Graph d a -> Graph d a
 -- insertNode n (G g)
@@ -36,10 +48,10 @@ member a (G g) = a `Map.member` graphNodeToId g
 deleteNode :: a -> Graph d a -> Graph d a
 deleteNode n (G g) = G $
   case Map.lookup n (graphNodeToId g) of
-       Just i  -> g { -- graphNodeNumber = graphNodeNumber g - 1
-                      graphIdToNode   = Map.delete i (graphIdToNode g)
+       Just i  -> g { graphNodeNumber = graphNodeNumber g - 1
+                    , graphIdToNode   = Map.delete i (graphIdToNode g)
                     , graphNodeToId   = Map.delete n (graphNodeToId g)
-                    , graphEdges      = Map.map (Set.delete i) $ Map.delete i (graphEdges g)
+                    , graphEdges      = Set.filter (\e -> edgeFrom e /= n && edgeTo e /= n) (graphEdges g)
                     , graphForeignPtr = Nothing
                     }
        Nothing -> g -- node not in graph
@@ -48,64 +60,53 @@ insertEdge :: Edge d a -> Graph d a -> Graph d a
 insertEdge e (G g)
   | e `Set.member` edges (G g) || f == t = G g -- edge already in g or invalid edge
   | otherwise = G $
-    case (Map.lookup f (graphNodeToId g), Map.lookup t (graphNodeToId g)) of
-         (Just fi, Just ti) -> insertEdge' (fi,  ti,  (G g))
-         (Nothing, Just ti) -> insertEdge' (i+1, ti,  insertNode f (i+1) (G g))
-         (Just fi, Nothing) -> insertEdge' (fi,  i+1, insertNode t (i+1) (G g))
-         (Nothing, Nothing) -> insertEdge' (i+1, i+2, insertNode t (i+2) $ insertNode f (i+1) (G g))
+    case (Map.member f (graphNodeToId g), Map.member t (graphNodeToId g)) of
+         (True,  True)  -> insertEdge' ((G g))
+         (False, True)  -> insertEdge' (insertNode f i (G g))
+         (True,  False) -> insertEdge' (insertNode t i (G g))
+         (False, False) -> insertEdge' (insertNode t (i+1) $ insertNode f i (G g))
  where
   (f,t) = (edgeFrom e, edgeTo e)
   i     = Map.size (graphIdToNode g)
 
-  insertEdge' (fi, ti, (G g')) =
+  insertEdge' (G g') =
     g' { graphEdgeNumber = graphEdgeNumber g' + 1
-       , graphEdges      = insertEdge'' fi ti (isDirected (G g')) (graphEdges g')
+       , graphEdges      = Set.insert e (graphEdges g')
        , graphForeignPtr = Nothing
        }
 
-  insertEdge'' f' t' False = insertEdge'' t' f' True
-                           . insertEdge'' f' t' True
-  insertEdge'' f' t' True  = Map.insertWith Set.union f' (Set.singleton t')
-
   insertNode :: a -> Int -> Graph d a -> Graph d a
   insertNode n ni (G g') = G $
-    g' { graphIdToNode   = Map.insert ni n  (graphIdToNode g')
+    g' { graphNodeNumber = graphNodeNumber g' + 1
+       , graphIdToNode   = Map.insert ni n  (graphIdToNode g')
        , graphNodeToId   = Map.insert n  ni (graphNodeToId g') }
 
 deleteEdge :: Edge d a -> Graph d a -> Graph d a
-deleteEdge e (G g) = G $
-  case (Map.lookup f (graphNodeToId g), Map.lookup t (graphNodeToId g)) of
-       (Just fi, Just ti) -> g { graphEdgeNumber = graphEdgeNumber g - 1
-                               , graphEdges      = deleteEdge' fi ti (isDirected (G g)) (graphEdges g)
-                               , graphForeignPtr = Nothing
-                               }
-       _                  -> g -- not both nodes in graph
+deleteEdge e (G g)
+  | Set.member e (graphEdges g) = deleteNodes $ G $
+    g { graphEdges      = Set.delete e (graphEdges g)
+      , graphEdgeNumber = graphEdgeNumber g - 1
+      , graphForeignPtr = Nothing
+      }
+  | otherwise = G g
  where
   (f,t) = (edgeFrom e, edgeTo e)
-  deleteEdge' f' t' False = deleteEdge' t' f' True
-                          . deleteEdge' f' t' True
-  deleteEdge' f' t' True  = Map.adjust (Set.delete t') f'
+  deleteNodes g' =
+    let delF = if Set.null (neighbours f g') then deleteNode f else id
+        delT = if Set.null (neighbours t g') then deleteNode t else id
+     in delT . delF $ g'
 
 nodes :: Graph d a -> HashSet a
-nodes (G g) = Set.fromList . Map.keys $ graphNodeToId g
+nodes (G g) = Set.fromList $ Map.keys $ graphNodeToId g
 
 edges :: Graph d a -> HashSet (Edge d a)
-edges (G g) = Map.foldrWithKey (\f ts es -> Set.union (Set.map (mkEdge f) ts) es) Set.empty (graphEdges g)
- where
-  mkEdge f t
-    | Just fn <- Map.lookup f (graphIdToNode g)
-    , Just tn <- Map.lookup t (graphIdToNode g)
-    = toEdge fn tn
-    | otherwise
-    = error "edges: Graph node/ID mismatch."
+edges (G g) = graphEdges g
 
 neighbours :: a -> Graph d a -> HashSet a
-neighbours n (G g)
-  | Just i <- Map.lookup n (graphNodeToId g)
-  = maybe Set.empty (Set.map mkNode) $ Map.lookup i (graphEdges g)
-  | otherwise
-  = Set.empty
+neighbours n g@(G _) =
+  Set.foldr neighbours' Set.empty (edges g)
  where
-  mkNode i | Just n' <- Map.lookup i (graphIdToNode g) = n'
-           | otherwise
-           = error "neighbours: Graph node/ID mismatch."
+  neighbours' e r
+    | edgeFrom e == n                       = Set.insert (edgeTo   e) r
+    | edgeTo   e == n && not (isDirected g) = Set.insert (edgeFrom e) r
+    | otherwise                             = r
