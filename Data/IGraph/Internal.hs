@@ -44,17 +44,17 @@ foreign import ccall "c_igraph_vs_create"
 foreign import ccall "&c_igraph_vs_destroy"
   c_igraph_vs_destroy :: FunPtr (VsPtr -> IO ())
 
-newVs :: IO VsFPtr
+newVs :: IO VsForeignPtr
 newVs = do
   vsp <- c_igraph_vs_create
-  newForeignPtr c_igraph_vs_destroy vsp
+  fvp <- newForeignPtr c_igraph_vs_destroy vsp
+  return $ VsF fvp
 
-withVs :: VsFPtr -> (VsPtr -> IO res) -> IO res
-withVs fvs = withForeignPtr fvs
-
-applyVs :: VsIdent a -> VertexSelector a -> IO VsFPtr
+applyVs :: VsIdent a -> VertexSelector a -> IO VsForeignPtr
 applyVs f (Vs vs) = vs f
 
+withVs :: VsForeignPtr -> (VsPtr -> IO res) -> IO res
+withVs (VsF fvs) = withForeignPtr fvs
 
 --------------------------------------------------------------------------------
 -- Vectors
@@ -85,18 +85,22 @@ vectorToList (Vector fvp) = withForeignPtr fvp $ \vp -> do
                     go (realToFrac e : acc) (i - 1)
   go [] len
 
-{-
-vectorPtrToList :: VectorPtrPtr -> IO [[Double]]
-vectorPtrToList fvp = withForeignPtr fvp $ \vp -> do
+newVectorPtr :: Int -> IO VectorP
+newVectorPtr s = do
+  vp  <- c_igraph_vector_ptr_create (fromIntegral s)
+  fvp <- newForeignPtr c_igraph_vector_ptr_destroy vp
+  return $ VectorP fvp
+
+vectorPtrToList :: VectorP -> IO [[Double]]
+vectorPtrToList (VectorP fvp) = withForeignPtr fvp $ \vp -> do
   len <- c_igraph_vector_ptr_length vp
   let go :: [[Double]] -> CLong -> IO [[Double]]
       go acc 0 = return acc
       go acc i = do e <- c_igraph_vector_ptr_get vp (i - 1)
                     efp <- newForeignPtr c_igraph_vector_destroy e
-                    v <- vectorToList efp
+                    v <- vectorToList (Vector efp)
                     go (v : acc) (i - 1)
   go [] len
--}
 
 edgesToVector :: Graph d a -> IO Vector
 edgesToVector g@(G g') =
@@ -179,6 +183,9 @@ withMatrix (Matrix fmp) = withForeignPtr fmp
 withVector :: Vector -> (VectorPtr -> IO a) -> IO a
 withVector (Vector fvp) = withForeignPtr fvp
 
+withVectorPtr :: VectorP -> (VectorPtrPtr -> IO a) -> IO a
+withVectorPtr (VectorP fvp) = withForeignPtr fvp
+
 withGraph :: Graph d a -> (GraphPtr -> IO res) -> IO (res, Graph d a)
 withGraph g@(G g') io
   | Just fp <- graphForeignPtr g' = fmap (,g) (withForeignPtr fp io)
@@ -200,15 +207,16 @@ withGraph_ g io = fmap fst $ withGraph g io
 foreign import ccall "c_igraph_create"                    c_igraph_create                     :: VectorPtr -> CInt -> IO GraphPtr
 foreign import ccall "&c_igraph_destroy"                  c_igraph_destroy                    :: FunPtr (GraphPtr  -> IO ())
 
-foreign import ccall "c_igraph_vector_create"             c_igraph_vector_create              :: CLong  -> IO VectorPtr
+foreign import ccall "c_igraph_vector_create"             c_igraph_vector_create              :: CLong -> IO VectorPtr
 foreign import ccall "&c_igraph_vector_destroy"           c_igraph_vector_destroy             :: FunPtr (VectorPtr -> IO ())
---foreign import ccall "c_igraph_vector_ptr_destroy"        c_igraph_vector_ptr_destroy         :: VectorPtrPtr -> IO ()
+foreign import ccall "c_igraph_vector_ptr_create"         c_igraph_vector_ptr_create          :: CLong -> IO VectorPtrPtr
+foreign import ccall "&c_igraph_vector_ptr_destroy"       c_igraph_vector_ptr_destroy         :: FunPtr (VectorPtrPtr -> IO ())
 
 foreign import ccall "igraph_vector_set"                  c_igraph_vector_set                 :: VectorPtr -> CLong -> CDouble -> IO ()
 foreign import ccall "igraph_vector_e"                    c_igraph_vector_get                 :: VectorPtr -> CLong -> IO CDouble
 foreign import ccall "igraph_vector_size"                 c_igraph_vector_length              :: VectorPtr -> IO CLong
---foreign import ccall "igraph_vector_ptr_e"                c_igraph_vector_ptr_get             :: VectorPtrPtr -> CLong -> IO VectorPtr
---foreign import ccall "igraph_vector_ptr_size"             c_igraph_vector_ptr_length          :: VectorPtrPtr -> IO CLong
+foreign import ccall "igraph_vector_ptr_e"                c_igraph_vector_ptr_get             :: VectorPtrPtr -> CLong -> IO VectorPtr
+foreign import ccall "igraph_vector_ptr_size"             c_igraph_vector_ptr_length          :: VectorPtrPtr -> IO CLong
 
 
 --------------------------------------------------------------------------------

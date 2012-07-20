@@ -1,5 +1,6 @@
 {-# LANGUAGE MultiParamTypeClasses, FlexibleContexts, FlexibleInstances,
-             TypeFamilies, GADTs, EmptyDataDecls, UndecidableInstances
+             TypeFamilies, GADTs, EmptyDataDecls, UndecidableInstances,
+             EmptyDataDecls
              #-}
 
 module Data.IGraph.Types where
@@ -17,22 +18,28 @@ import Foreign.ForeignPtr
 
 type GraphPtr = Ptr ()
 
-type VectorPtr    = Ptr ()
-type VectorPtrPtr = Ptr ()
-newtype Vector    = Vector { unVector :: ForeignPtr () }
 
-type MatrixPtr = Ptr ()
-newtype Matrix = Matrix { unMatrix :: ForeignPtr () }
+data Vec
+type VectorPtr    = Ptr Vec
+data VecPtr
+type VectorPtrPtr = Ptr VecPtr
+newtype Vector    = Vector    { unV  :: ForeignPtr Vec }
+newtype VectorP   = VectorP   { unVP :: ForeignPtr VecPtr }
 
-type VsPtr     = Ptr ()
-type VsFPtr    = ForeignPtr ()
+data Mat
+type MatrixPtr    = Ptr Mat
+newtype Matrix    = Matrix    { unM  :: ForeignPtr Mat }
+
+data Vs
+type VsPtr     = Ptr Vs
 type VsIdent a = (a -> Maybe Int)
 
 -- | The Haskell representation of vertex selectors. The type variable @a@ has
 -- to match the type used in your graph @Graph d a@ when applying the vertex
 -- selector. If you supply nodes in your vertex selector which aren't available
 -- in the corresponding graph, `vsNone' is used as fallback.
-newtype VertexSelector a = Vs { unVs :: VsIdent a -> IO VsFPtr }
+newtype VertexSelector a = Vs  { unVs  :: VsIdent a -> IO VsForeignPtr }
+newtype VsForeignPtr     = VsF { unVsF :: ForeignPtr Vs }
 
 --------------------------------------------------------------------------------
 -- Graph representation

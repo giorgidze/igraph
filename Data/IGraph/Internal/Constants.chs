@@ -6,8 +6,17 @@
 module Data.IGraph.Internal.Constants where
 
 #include <igraph/igraph_constants.h>
+#include <igraph/igraph_iterators.h>
 
-{#enum igraph_i_directed_t as Directed
+{#context prefix = "igraph" #}
+
+sizeOfVit :: Int
+sizeOfVit = {#sizeof vit_t #}
+
+sizeOfVector :: Int
+sizeOfVector = {#sizeof vector_t #}
+
+{#enum i_directed_t as Directed
   { IGRAPH_UNDIRECTED as Undirected, IGRAPH_DIRECTED as Directed }
   deriving (Eq, Show) #}
 
@@ -33,13 +42,13 @@ module Data.IGraph.Internal.Constants where
 -- graphs. Valid modes are: `Out' follows edge directions; `In' follows
 -- the opposite directions; and `All' ignores edge directions. This argument
 -- is ignored for undirected graphs.
-{#enum igraph_neimode_t as NeiMode
+{#enum neimode_t as NeiMode
   { IGRAPH_OUT as Out, IGRAPH_IN as In, IGRAPH_ALL as All, IGRAPH_TOTAL as Total }
   deriving (Eq, Show) #}
 
 -- | For a directed graph this specifies whether to calculate weak or strong
 -- connectedness. This argument is ignored for undirected graphs.
-{#enum igraph_connectedness_t as Connectedness
+{#enum connectedness_t as Connectedness
   { IGRAPH_WEAK as Weak, IGRAPH_STRONG as Strong }
   deriving (Eq, Show) #}
 

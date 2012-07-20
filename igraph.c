@@ -96,55 +96,129 @@ void c_igraph_vs_destroy (igraph_vs_t* vs)
     return;
 }
 
-/*
+/*******************************************************************************
+ *
+ * 11.3 Generic vertex selector operations
+ *
+ */
 
-igraph_vector_t* c_igraph_betweenness(const igraph_t* graph)
+int selected_vertices(const igraph_t *graph, const igraph_vs_t *vs, igraph_vector_t* vector)
 {
-    igraph_vector_t* result = c_igraph_vector_create(0);
-    igraph_betweenness(graph, result, igraph_vss_all(), IGRAPH_DIRECTED, NULL, 0);
-    return result;
+    igraph_vit_t vit;
+    igraph_vit_create(graph, *vs, &vit);
+    int i = 0;
+    while (!IGRAPH_VIT_END(vit)) {
+        igraph_vector_set(vector, i, IGRAPH_VIT_GET(vit));
+        IGRAPH_VIT_NEXT(vit);
+        i++;
+    }
+    igraph_vit_destroy(&vit);
+    return 0;
+}
+/*******************************************************************************
+ *
+ * 13.2 Shortest Path Related Functions
+ *
+ */
+
+int shortest_paths(const igraph_t *graph, igraph_matrix_t *res, 
+        const igraph_vs_t *from, const igraph_vs_t *to,
+        igraph_neimode_t mode)
+{
+    return igraph_shortest_paths(graph, res, *from, *to, mode);
+}
+
+/*******************************************************************************
+ *
+ * 13.3 Neighborhood of a vertex
+ *
+ */
+
+int neighborhood(const igraph_t *graph, igraph_vector_ptr_t *res,
+      igraph_vs_t *vids, igraph_integer_t order,
+      igraph_neimode_t mode)
+{
+    return igraph_neighborhood(graph, res, *vids, order, mode);
+}
+
+int neighborhood_graphs (const igraph_t *graph, igraph_vector_ptr_t *res, igraph_vs_t* vids, igraph_integer_t order, igraph_neimode_t mode)
+{
+    return igraph_neighborhood_graphs(graph, res, *vids, order, mode);
 }
 
 
-igraph_vector_t* c_igraph_closeness_in(const igraph_t* graph, int vertex)
+/*******************************************************************************
+ *
+ * 13.4 Graph Components
+ *
+ */
+
+int subgraph(const igraph_t *graph, igraph_t *res, const igraph_vs_t* vids)
 {
-    igraph_vector_t* result = c_igraph_vector_create(0);
-    igraph_closeness(graph, result, igraph_vss_1(vertex), IGRAPH_IN, NULL);
-    return result;
+    return igraph_subgraph(graph, res, *vids);
 }
 
+/*******************************************************************************
+ *
+ * 13.5 Centrality Measures
+ *
+ */
 
-igraph_vector_t* c_igraph_closeness_out(const igraph_t* graph, int vertex)
+int closeness(const igraph_t *graph, igraph_vector_t *res, const igraph_vs_t* vids, igraph_neimode_t mode, const igraph_vector_t *weights)
 {
-    igraph_vector_t* result = c_igraph_vector_create(0);
-    igraph_closeness(graph, result, igraph_vss_1(vertex), IGRAPH_OUT, NULL);
-    return result;
+    return igraph_closeness(graph, res, *vids, mode, weights);
 }
 
-
-igraph_vector_t* c_igraph_eigenvector_centrality(const igraph_t* graph)
+int betweenness(const igraph_t *graph, igraph_vector_t *res, const igraph_vs_t* vids, igraph_bool_t directed, const igraph_vector_t* weights, igraph_bool_t nobigint)
 {
-    igraph_vector_t* result = c_igraph_vector_create(0);
-    igraph_arpack_options_t arpack_options;
-    igraph_arpack_options_init(&arpack_options);
-    igraph_eigenvector_centrality(graph, result, NULL, 1, 1, NULL, &arpack_options);
-    return result;
+    return igraph_betweenness(graph, res, *vids, directed, weights, nobigint);
 }
 
-
-igraph_vector_t* c_igraph_clusters(const igraph_t* graph)
+int pagerank(const igraph_t *graph, igraph_vector_t *vector,
+        igraph_real_t *value, const igraph_vs_t *vids,
+        igraph_bool_t directed, igraph_real_t damping, 
+        const igraph_vector_t *weights,
+        igraph_arpack_options_t *options)
 {
-    igraph_vector_t* result = c_igraph_vector_create(0);
-    igraph_clusters(graph, result, NULL, NULL, IGRAPH_WEAK);
-    return result;
+    return igraph_pagerank(graph, vector, value, *vids, directed, damping, weights, options);
 }
 
-
-igraph_vector_ptr_t* c_igraph_get_shortest_paths_in (const igraph_t* graph, int vertex)
+int personalized_pagerank(const igraph_t *graph, igraph_vector_t *vector,
+        igraph_real_t *value, const igraph_vs_t *vids,
+        igraph_bool_t directed, igraph_real_t damping, 
+        igraph_vector_t *reset,
+        const igraph_vector_t *weights,
+        igraph_arpack_options_t *options)
 {
-    igraph_vector_ptr_t* result = c_igraph_vector_ptr_create(igraph_vcount(graph));
-    igraph_get_shortest_paths(graph, result, NULL, vertex, igraph_vss_all(), IGRAPH_IN);
-    return result;
+    return igraph_personalized_pagerank(graph, vector, value, *vids, directed, damping, reset, weights, options);
 }
 
-*/
+int personalized_pagerank_vs(const igraph_t *graph, igraph_vector_t *vector,
+        igraph_real_t *value, const igraph_vs_t* vids,
+        igraph_bool_t directed, igraph_real_t damping, 
+        igraph_vs_t* reset_vids,
+        const igraph_vector_t *weights,
+        igraph_arpack_options_t *options)
+{
+    return igraph_personalized_pagerank_vs(graph, vector, value, *vids, directed, damping, *reset_vids, weights, options);
+}
+
+int constraint(const igraph_t *graph, igraph_vector_t *res,
+          igraph_vs_t* vids, const igraph_vector_t *weights)
+{
+    return igraph_constraint(graph, res, *vids, weights);
+}
+
+int maxdegree(const igraph_t *graph, igraph_integer_t *res,
+         igraph_vs_t *vids, igraph_neimode_t mode, 
+         igraph_bool_t loops)
+{
+    return igraph_maxdegree(graph, res, *vids, mode, loops);
+}
+
+int strength(const igraph_t *graph, igraph_vector_t *res,
+        const igraph_vs_t *vids, igraph_neimode_t mode,
+        igraph_bool_t loops, const igraph_vector_t *weights)
+{
+    return igraph_strength(graph, res, *vids, mode, loops, weights);
+}

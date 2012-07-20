@@ -6,22 +6,33 @@ module Data.IGraph
   , emptyGraph, fromList
   , insertEdge, deleteEdge, deleteNode
     -- * Query
-  , numberOfNodes, numberOfEdges, member, nodes, edges, neighbours
+  , numberOfNodes, numberOfEdges, member, nodes, edges --, neighbours
 
     -- * Chapter 11. Vertex and Edge Selectors and Sequences, Iterators
+
     -- ** 11\.2 Vertex selector constructors
   , VertexSelector, vsAll, vsAdj, vsNonadj, vsNone, vs1, vsList, vsSeq
+
     -- ** 11\.3. Generic vertex selector operations
   , vsIsAll , vsSize
+  , selectedVertices
 
     -- * Chapter 13\. Structural Properties of Graphs
+
     -- ** 13\.1 Basic properties
   , areConnected
+
     -- ** 13\.2 Shortest Path Related Functions
-  , getShortestPath, NeiMode(..)
+  , shortestPaths, getShortestPath
+  , NeiMode(..)
+
+    -- ** 13\.3 Neighborhood of a vertex
+  , neighborhood
 
     -- ** 13\.4 Graph Components
-  , isConnected, Connectedness(..)
+  --, subgraph
+  , isConnected
+  , Connectedness(..)
   ) where
 
 import Data.IGraph.Basics
@@ -29,11 +40,15 @@ import Data.IGraph.Internal
 import Data.IGraph.Internal.Constants
 import Data.IGraph.Types
 
+import Data.Map (Map)
+import qualified Data.Map as Map
+
 import Foreign.C
 import Foreign.Ptr
 import Foreign.Marshal
 import Foreign.Storable
 import System.IO.Unsafe
+
 
 --------------------------------------------------------------------------------
 -- 11.2 Vertex selector constructors
@@ -116,10 +131,9 @@ vsSeq f t = Vs $ \ident -> do
     b <- mb
     return (a,b)
 
-onSuccessfulVsIdent :: VsFPtr -> Maybe a -> (a -> IO CInt) -> IO CInt
+onSuccessfulVsIdent :: VsForeignPtr -> Maybe a -> (a -> IO CInt) -> IO CInt
 onSuccessfulVsIdent fvs Nothing  _ = withVs fvs c_igraph_vs_none
 onSuccessfulVsIdent _   (Just a) f = f a
-
 
 
 --------------------------------------------------------------------------------
@@ -146,6 +160,18 @@ vsSize g vs = unsafePerformIO $ alloca $ \rp -> do
   ci <- peek rp
   return $ fromIntegral ci
 
+foreign import ccall "selected_vertices"
+  c_selected_vertices :: GraphPtr -> VsPtr -> VectorPtr -> IO Int
+
+selectedVertices :: Graph d a -> VertexSelector a -> [a]
+selectedVertices g vs = unsafePerformIO $ do
+  v   <- newVector (vsSize g vs)
+  fvs <- applyVs (nodeToId g) vs
+  _e  <- withGraph_ g $ \gp -> withVs fvs $ \vsp -> withVector v $ \vp ->
+    c_selected_vertices gp vsp vp
+  l   <- vectorToList v
+  return $ map (idToNode' g . round) l
+
 
 --------------------------------------------------------------------------------
 -- 13.1 Basic properties
@@ -169,13 +195,22 @@ areConnected g@(G _) n1 n2
 --------------------------------------------------------------------------------
 -- 13.2 Shortest Path Related Functions
 
---foreign import ccall "igraph_shortest_paths"
-  --c_igraph_shortest_paths :: GraphPtr -> MatrixPtr -> VsPtr -> VsPtr -> CInt -> IO CInt
+foreign import ccall "shortest_paths"
+  c_igraph_shortest_paths :: GraphPtr -> MatrixPtr -> VsPtr -> VsPtr -> CInt -> IO CInt
 
---shortestPath :: Graph d a -> a -> a -> Matrix
---shortestPath g f t = unsafePerformIO $ do
-  --m <- newMatrix 0 0
-  
+shortestPaths :: Ord a => Graph d a -> VertexSelector a -> VertexSelector a -> NeiMode -> Map a (Map a (Maybe Int))
+shortestPaths g@(G _) vsf vst m = unsafePerformIO $ do
+  ma <- newMatrix 0 0
+  vf <- applyVs (nodeToId g) vsf
+  vt <- applyVs (nodeToId g) vst
+  _e <- withGraph_ g $ \gp -> withMatrix ma $ \mp -> withVs vf $ \vfp -> withVs vt $ \vtp ->
+    c_igraph_shortest_paths gp mp vfp vtp (fromIntegral $ fromEnum m)
+  l  <- matrixToList ma
+  let nf = selectedVertices g vsf
+      nt = selectedVertices g vst
+  return $ Map.fromList . zip nf $ map (Map.fromList . zip nt . map roundMaybe) l
+ where
+  roundMaybe d = if d == 1/0 then Nothing else Just (round d)
 
 foreign import ccall "igraph_get_shortest_path"
   c_igraph_get_shortest_path :: GraphPtr -> VectorPtr -> VectorPtr -> CInt -> CInt -> CInt -> IO CInt
@@ -199,7 +234,37 @@ getShortestPath g@(G _) n1 n2 m
 
 
 --------------------------------------------------------------------------------
+-- 13.3 Neighborhood of a vertex
+
+foreign import ccall "neighborhood"
+  c_igraph_neighborhood :: GraphPtr -> VectorPtrPtr -> VsPtr -> CInt -> CInt -> IO CInt
+
+neighborhood :: Graph d a -> VertexSelector a -> Int -> NeiMode -> [[a]]
+neighborhood g vs o m = unsafePerformIO $ do
+  fvs <- applyVs (nodeToId g) vs
+  v   <- newVectorPtr 10
+  _e  <- withGraph_ g $ \gp -> withVs fvs $ \vsp -> withVectorPtr v $ \vp ->
+    c_igraph_neighborhood gp vp vsp (fromIntegral o) (fromIntegral (fromEnum m))
+  ids <- vectorPtrToList v
+  return $ map (map (idToNode' g . round)) ids
+
+
+--------------------------------------------------------------------------------
 -- 13.4 Graph Components
+
+{-
+foreign import ccall "igraph_subgraph"
+  c_igraph_subgraph :: GraphPtr -> GraphPtr -> VsPtr -> IO CInt
+
+subgraph :: Graph d a -> VertexSelector a -> Graph d a
+subgraph g@(G _) vs = unsafePerformIO $ do
+  fvs <- applyVs (nodeToId g) vs
+  let g' = emptyGraph
+  (_e, g'') <- withGraph_ g $ \gp -> withVs fvs $ \vsp ->
+    withGraph g' $ \gp' ->
+      c_igraph_subgraph gp gp' vsp
+  return g'' -- TODO: read from pointer!
+-}
 
 foreign import ccall "igraph_is_connected"
   c_igraph_is_connected :: GraphPtr -> Ptr CInt -> CInt -> IO CInt
