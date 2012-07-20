@@ -1,7 +1,7 @@
 #include <stdlib.h>
 #include <igraph/igraph.h>
 
-igraph_t* c_igraph_create (const igraph_vector_t* edges, int directed)
+igraph_t* c_igraph_create (const igraph_vector_t* edges, igraph_bool_t directed)
 {
     igraph_t* graph = (igraph_t*) malloc (sizeof (igraph_t));
     igraph_create(graph, edges, 0, directed);
