@@ -11,6 +11,8 @@ module Data.IGraph
     -- * Chapter 11. Vertex and Edge Selectors and Sequences, Iterators
     -- ** 11\.2 Vertex selector constructors
   , Vs, vsAll, vsAdj, vsNonadj, vsNone, vs1, vsList, vsSeq
+    -- ** 11\.3. Generic vertex selector operations
+  , vsIsAll, vsSize
 
     -- * Chapter 13\. Structural Properties of Graphs
     -- ** 13\.1 Basic properties
@@ -128,6 +130,30 @@ vsSeq g f t
   | otherwise
   = Nothing
 
+
+--------------------------------------------------------------------------------
+-- 11.3. Generic vertex selector operations
+
+foreign import ccall "igraph_vs_is_all"
+  c_igraph_vs_is_all :: VsPtr -> IO CInt
+
+vsIsAll :: Vs -> Bool
+vsIsAll vs = unsafePerformIO $ do
+  r <- withVs vs $ \vsp ->
+    c_igraph_vs_is_all vsp
+  return $ r == 1
+
+foreign import ccall "igraph_vs_size"
+  c_igraph_vs_size :: GraphPtr -> VsPtr -> Ptr CInt -> IO CInt
+
+vsSize :: Graph d a -> Vs -> Int
+vsSize g vs = unsafePerformIO $ alloca $ \rp -> do
+  _e <- withGraph_ g $ \gp -> withVs vs $ \vsp ->
+    c_igraph_vs_size gp vsp rp
+  ci <- peek rp
+  return $ fromIntegral ci
+
+
 --------------------------------------------------------------------------------
 -- 13.1 Basic properties
 
@@ -150,8 +176,8 @@ areConnected g@(G _) n1 n2
 --------------------------------------------------------------------------------
 -- 13.2 Shortest Path Related Functions
 
-foreign import ccall "igraph_shortest_paths"
-  c_igraph_shortest_paths :: GraphPtr -> MatrixPtr -> VsPtr -> VsPtr -> CInt -> IO CInt
+--foreign import ccall "igraph_shortest_paths"
+  --c_igraph_shortest_paths :: GraphPtr -> MatrixPtr -> VsPtr -> VsPtr -> CInt -> IO CInt
 
 --shortestPath :: Graph d a -> a -> a -> Matrix
 --shortestPath g f t = unsafePerformIO $ do
