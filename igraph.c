@@ -96,6 +96,23 @@ void c_igraph_vs_destroy (igraph_vs_t* vs)
     return;
 }
 
+
+/*******************************************************************************
+ * 
+ * Helpers
+ *
+ */
+
+igraph_vector_ptr_t* edges(const igraph_t *graph)
+{
+    igraph_vector_ptr_t* res = (igraph_vector_ptr_t*) malloc(sizeof(igraph_vector_ptr_t));
+    igraph_vector_ptr_init(res, 2);
+    igraph_vector_ptr_set(res, 0, (void*)&graph->from);
+    igraph_vector_ptr_set(res, 1, (void*)&graph->to);
+    return res;
+}
+
+
 /*******************************************************************************
  *
  * 11.3 Generic vertex selector operations

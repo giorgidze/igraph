@@ -30,7 +30,7 @@ module Data.IGraph
   , neighborhood
 
     -- ** 13\.4 Graph Components
-  --, subgraph
+  , subgraph
   , isConnected
   , Connectedness(..)
   ) where
@@ -43,12 +43,8 @@ import Data.IGraph.Types
 import Data.Map (Map)
 import qualified Data.Map as Map
 
+import Foreign
 import Foreign.C
-import Foreign.Ptr
-import Foreign.Marshal
-import Foreign.Storable
-import System.IO.Unsafe
-
 
 --------------------------------------------------------------------------------
 -- 11.2 Vertex selector constructors
@@ -252,19 +248,21 @@ neighborhood g vs o m = unsafePerformIO $ do
 --------------------------------------------------------------------------------
 -- 13.4 Graph Components
 
-{-
-foreign import ccall "igraph_subgraph"
+foreign import ccall "subgraph"
   c_igraph_subgraph :: GraphPtr -> GraphPtr -> VsPtr -> IO CInt
 
 subgraph :: Graph d a -> VertexSelector a -> Graph d a
 subgraph g@(G _) vs = unsafePerformIO $ do
   fvs <- applyVs (nodeToId g) vs
-  let g' = emptyGraph
-  (_e, g'') <- withGraph_ g $ \gp -> withVs fvs $ \vsp ->
-    withGraph g' $ \gp' ->
-      c_igraph_subgraph gp gp' vsp
-  return g'' -- TODO: read from pointer!
--}
+  withGraph_ g $ \gp -> withVs fvs $ \vsp ->
+    withGraph_ (emptyWithCtxt g) $ \gp' -> do
+      _e      <- c_igraph_subgraph gp gp' vsp
+      (G g'') <- subgraphFromPtr g gp'
+      fgp'    <- newForeignPtr c_igraph_destroy gp'
+      return $ G g'' { graphForeignPtr = Just fgp' }
+ where
+  emptyWithCtxt :: Graph d a -> Graph d a
+  emptyWithCtxt (G _) = emptyGraph
 
 foreign import ccall "igraph_is_connected"
   c_igraph_is_connected :: GraphPtr -> Ptr CInt -> CInt -> IO CInt

@@ -35,6 +35,24 @@ edgeIdToEdge g i
  where
   es = edges g
 
+
+--------------------------------------------------------------------------------
+-- Graphs
+
+foreign import ccall "edges"
+  c_igraph_edges :: GraphPtr -> IO VectorPtrPtr
+
+subgraphFromPtr :: Graph d a    -- ^ original graph containing all informations
+                                -- about node labels etc.
+                -> GraphPtr
+                -> IO (Graph d a)
+subgraphFromPtr g@(G _) gp = do
+  vpp     <- c_igraph_edges gp
+  vp      <- newVectorPtr' vpp
+  [l1,l2] <- vectorPtrToVertices g vp
+  return $ fromList (zip l1 l2)
+
+
 --------------------------------------------------------------------------------
 -- Vertex selectors
 
@@ -61,7 +79,11 @@ withVs (VsF fvs) = withForeignPtr fvs
 
 newVector :: Int -> IO Vector
 newVector s = do
-  vp  <- c_igraph_vector_create (fromIntegral s)
+  vp <- c_igraph_vector_create (fromIntegral s)
+  newVector' vp
+
+newVector' :: VectorPtr -> IO Vector
+newVector' vp = do
   fvp <- newForeignPtr c_igraph_vector_destroy vp
   return $ Vector fvp
 
@@ -87,7 +109,11 @@ vectorToList (Vector fvp) = withForeignPtr fvp $ \vp -> do
 
 newVectorPtr :: Int -> IO VectorP
 newVectorPtr s = do
-  vp  <- c_igraph_vector_ptr_create (fromIntegral s)
+  vp <- c_igraph_vector_ptr_create (fromIntegral s)
+  newVectorPtr' vp
+
+newVectorPtr' :: VectorPtrPtr -> IO VectorP
+newVectorPtr' vp = do
   fvp <- newForeignPtr c_igraph_vector_ptr_destroy vp
   return $ VectorP fvp
 
@@ -118,6 +144,9 @@ vectorToVertices :: Graph d a -> Vector -> IO [a]
 vectorToVertices g@(G _) v = do
   fmap (map (idToNode' g . round)) (vectorToList v)
 
+vectorPtrToVertices :: Graph d a -> VectorP -> IO [[a]]
+vectorPtrToVertices g@(G _) v = do
+  fmap (map (map (idToNode' g . round))) (vectorPtrToList v)
 
 --------------------------------------------------------------------------------
 -- Matrices
