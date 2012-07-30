@@ -30,7 +30,7 @@ module Data.IGraph
   , neighborhood
 
     -- ** 13\.4 Graph Components
-  , subgraph
+  --, subgraph
   , isConnected
   , Connectedness(..)
   ) where
@@ -248,6 +248,11 @@ neighborhood g vs o m = unsafePerformIO $ do
 --------------------------------------------------------------------------------
 -- 13.4 Graph Components
 
+{- Problem with `subgraphs' is that we use ID->Label node identification, but
+ - the subgraph function reassigns ids to vertices, making it impossible for us
+ - to re-identify the vertices by their IDs. Not sure how this could be
+ - implemented at all…
+
 foreign import ccall "subgraph"
   c_igraph_subgraph :: GraphPtr -> GraphPtr -> VsPtr -> IO CInt
 
@@ -263,6 +268,7 @@ subgraph g@(G _) vs = unsafePerformIO $ do
  where
   emptyWithCtxt :: Graph d a -> Graph d a
   emptyWithCtxt (G _) = emptyGraph
+-}
 
 foreign import ccall "igraph_is_connected"
   c_igraph_is_connected :: GraphPtr -> Ptr CInt -> CInt -> IO CInt
