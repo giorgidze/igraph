@@ -17,12 +17,14 @@ Library
     base >= 4.3.1.0,
     bytestring,
     containers,
+    mtl,
     unordered-containers,
     hashable
   Extra-Libraries:
     igraph
   C-Sources:
-    igraph.c
+    cbits/igraph.c
+    cbits/attributes.c
   Build-Tools:
     c2hs
   Exposed-modules:

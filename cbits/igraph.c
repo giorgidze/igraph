@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <stdio.h>
 #include <igraph/igraph.h>
 
 igraph_t* c_igraph_create (const igraph_vector_t* edges, igraph_bool_t directed)
@@ -8,7 +9,6 @@ igraph_t* c_igraph_create (const igraph_vector_t* edges, igraph_bool_t directed)
     return graph;
 }
 
-
 void c_igraph_destroy (igraph_t* graph)
 {
     if (graph)
@@ -16,7 +16,6 @@ void c_igraph_destroy (igraph_t* graph)
     free(graph);
     return;
 }
-
 
 igraph_vector_t* c_igraph_vector_create (long int size)
 {
@@ -26,7 +25,6 @@ igraph_vector_t* c_igraph_vector_create (long int size)
     return vector;
 }
 
-
 void c_igraph_vector_destroy (igraph_vector_t* vector)
 {
     if (vector)
@@ -34,7 +32,6 @@ void c_igraph_vector_destroy (igraph_vector_t* vector)
     free(vector);
     return;
 }
-
 
 igraph_vector_ptr_t* c_igraph_vector_ptr_create (long int size)
 {
@@ -49,7 +46,6 @@ igraph_vector_ptr_t* c_igraph_vector_ptr_create (long int size)
 
     return vector_ptr;
 }
-
 
 void c_igraph_vector_ptr_destroy (igraph_vector_ptr_t* vector_ptr)
 {
@@ -132,6 +128,103 @@ int selected_vertices(const igraph_t *graph, const igraph_vs_t *vs, igraph_vecto
     igraph_vit_destroy(&vit);
     return 0;
 }
+
+
+/*******************************************************************************
+ *
+ * 12. Graph, Vertex and Edge Attributes
+ *
+ */
+
+int at_init(igraph_t *graph, igraph_vector_ptr_t *attr) { return 0; }
+void at_destroy(igraph_t *graph) { return; }
+int at_copy(igraph_t *to, const igraph_t *from, igraph_bool_t ga,
+      igraph_bool_t va, igraph_bool_t ea) { return 0; }
+int at_add_vertices(igraph_t *graph, long int nv, igraph_vector_ptr_t *attr) { return 0; }
+int at_permute_vertices(const igraph_t *graph,
+      igraph_t *newgraph,
+      const igraph_vector_t *idx) { return 0; }
+int at_combine_vertices(const igraph_t *graph,
+      igraph_t *newgraph,
+      const igraph_vector_ptr_t *merges,
+      const igraph_attribute_combination_t *comb) { return 0; }
+int at_add_edges(igraph_t *graph, const igraph_vector_t *edges,
+     igraph_vector_ptr_t *attr) { return 0; }
+int at_permute_edges(const igraph_t *graph,
+         igraph_t *newgraph, const igraph_vector_t *idx) { return 0; }
+int at_combine_edges(const igraph_t *graph,
+         igraph_t *newgraph,
+         const igraph_vector_ptr_t *merges,
+         const igraph_attribute_combination_t *comb) { return 0; }
+int at_get_info(const igraph_t *graph,
+    igraph_strvector_t *gnames, igraph_vector_t *gtypes,
+    igraph_strvector_t *vnames, igraph_vector_t *vtypes,
+    igraph_strvector_t *enames, igraph_vector_t *etypes) { return 0; }
+igraph_bool_t at_has_attr(const igraph_t *graph, igraph_attribute_elemtype_t type,
+        const char *name) { return 0; }
+int at_gettype(const igraph_t *graph, igraph_attribute_type_t *type,
+   igraph_attribute_elemtype_t elemtype, const char *name) { return 0; }
+int at_get_numeric_graph_attr(const igraph_t *graph, const char *name,
+      igraph_vector_t *value) { return 0; }
+int at_get_string_graph_attr(const igraph_t *graph, const char *name,
+           igraph_strvector_t *value) { return 0; }
+int at_get_numeric_vertex_attr(const igraph_t *graph, const char *name,
+       igraph_vs_t vs,
+       igraph_vector_t *value) { return 0; }
+int at_get_string_vertex_attr(const igraph_t *graph, const char *name,
+      igraph_vs_t vs,
+      igraph_strvector_t *value) { return 0; }
+int at_get_numeric_edge_attr(const igraph_t *graph, const char *name,
+           igraph_es_t es,
+           igraph_vector_t *value) { return 0; }
+int at_get_string_edge_attr(const igraph_t *graph, const char *name,
+          igraph_es_t es,
+          igraph_strvector_t *value) { return 0; }
+
+igraph_attribute_table_t* create_attribute_table()
+{
+  igraph_attribute_table_t* t = (igraph_attribute_table_t*) malloc(sizeof(igraph_attribute_table_t));
+  t->init = &at_init;
+  t->destroy = &at_destroy;
+  t->copy = &at_copy;
+  t->add_vertices = &at_add_vertices;
+  t->permute_vertices = &at_permute_vertices;
+  t->combine_vertices = &at_combine_vertices;
+  t->add_edges = &at_add_edges;
+  t->permute_edges = &at_permute_edges;
+  t->combine_edges = &at_combine_edges;
+  t->get_info = &at_get_info;
+  t->gettype = &at_gettype;
+  t->get_numeric_graph_attr = &at_get_numeric_graph_attr;
+  t->get_string_graph_attr = &at_get_string_graph_attr;
+  t->get_numeric_vertex_attr = &at_get_numeric_vertex_attr;
+  t->get_string_vertex_attr = &at_get_string_vertex_attr;
+  t->get_numeric_edge_attr = &at_get_numeric_edge_attr;
+  t->get_string_edge_attr = &at_get_string_edge_attr;
+  return t;
+}
+
+void destroy_attribute_table(igraph_attribute_table_t* t)
+{
+    free(t);
+    return;
+}
+
+void set_attribute_permute_vertices(igraph_attribute_table_t* t,
+    int (*pv)(const igraph_t *graph, igraph_t *newgraph, const igraph_vector_t *idx))
+{
+    t->permute_vertices = pv;
+    return;
+}
+
+void set_attribute_permute_edges(igraph_attribute_table_t* t,
+    int (*pe)(const igraph_t *graph, igraph_t *newgraph, const igraph_vector_t *idx))
+{
+    t->permute_edges = pe;
+    return;
+}
+
+
 /*******************************************************************************
  *
  * 13.2 Shortest Path Related Functions

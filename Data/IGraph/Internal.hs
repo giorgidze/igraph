@@ -12,19 +12,20 @@ import qualified Data.HashMap.Strict as Map
 import qualified Data.HashSet as Set
 
 import Control.Monad
+import Control.Monad.State
 import Data.IORef
-import Foreign.Ptr
-import Foreign.ForeignPtr
-import Foreign.C.Types
+import Foreign
+import Foreign.C
 
+import Debug.Trace
 
-nodeToId' :: Graph d a -> a -> Int
-nodeToId' (G g) n
+nodeToId'' :: Graph d a -> a -> Int
+nodeToId'' (G g) n
   | Just i <- Map.lookup n (graphNodeToId g) = i
   | otherwise = error $ "nodeToId': Graph node/ID mismatch."
 
-idToNode' :: Graph d a -> Int -> a
-idToNode' (G g) i
+idToNode'' :: Graph d a -> Int -> a
+idToNode'' (G g) i
   | Just n <- Map.lookup i (graphIdToNode g) = n
   | otherwise = error $ "idToNode': Graph ID/node mismatch, ID = " ++ show i
 
@@ -33,11 +34,69 @@ edgeIdToEdge g i
   | i < 0 || i >= Set.size es = error ("edgeIdToEdge: Index " ++ show i ++ " out of bound.")
   | otherwise                 = Set.toList es !! i
  where
-  es = edges g
+  es = edges' g
+
+
+--------------------------------------------------------------------------------
+-- IGraph
+
+runIGraph :: Graph d a -> IGraph (Graph d a) r -> (r, Graph d a)
+runIGraph g (IGraph ig) = runState ig g
+
+evalIGraph :: Graph d a -> IGraph (Graph d a) r -> r
+evalIGraph g (IGraph ig) = evalState ig g
+
+execIGraph :: Graph d a -> IGraph (Graph d a) r -> Graph d a
+execIGraph g (IGraph ig) = execState ig g
+
+foreign import ccall "igraphhaskell_initialize"
+  c_igraphhaskell_initialize :: IO CInt
+
+initIGraph :: IO ()
+initIGraph = {- (0 ==) -} (const ()) `fmap` c_igraphhaskell_initialize
+
+runUnsafeIO :: (Graph d a -> IO (r, Graph d a)) -> IGraph (Graph d a) r
+runUnsafeIO f = do
+  g <- get
+  (r,g') <- return $ unsafePerformIO $ initIGraph >> f g
+  put g'
+  return r
 
 
 --------------------------------------------------------------------------------
 -- Graphs
+
+foreign import ccall "c_igraph_create"
+  c_igraph_create :: VectorPtr -> CInt -> IO GraphPtr
+
+{-
+withGraph :: (GraphPtr -> IO res) -> IGraph (Graph d a) res
+withGraph f = do
+  io <- gets $ withGraph' `flip` f
+  let (r, g) = unsafePerformIO io
+  put g
+  return r
+-}
+
+withGraph :: Graph d a -> (GraphPtr -> IO res) -> IO (res, Graph d a)
+withGraph g@(G g') io
+  | Just fp <- graphForeignPtr g' = trace "withGraph: Using ForeignPtr" $
+                                    fmap (,g) (withForeignPtr fp io)
+  | otherwise                     = do
+    v <- edgesToVector g
+    withVector v $ \vp -> do
+      gp  <- c_igraph_create vp (if isDirected g then 1 else 0)
+      fp  <- newForeignPtr c_igraph_destroy gp
+      res <- withForeignPtr fp io
+      return (res, G g'{ graphForeignPtr = Just fp })
+
+withGraph_ :: Graph d a -> (GraphPtr -> IO res) -> IO res
+withGraph_ g io = fmap fst $ withGraph g io
+
+setGraphPointer :: Graph d a -> GraphPtr -> IO (Graph d a)
+setGraphPointer (G g) gp = do
+  fp <- newForeignPtr c_igraph_destroy gp
+  return $ G g{ graphForeignPtr = Just fp }
 
 foreign import ccall "edges"
   c_igraph_edges :: GraphPtr -> IO VectorPtrPtr
@@ -51,6 +110,38 @@ subgraphFromPtr g@(G _) gp = do
   vp      <- newVectorPtr' vpp
   [l1,l2] <- vectorPtrToVertices g vp
   return $ fromList (zip l1 l2)
+
+--
+-- Graph IDs
+--
+
+foreign import ccall "igraphhaskell_graph_set_vertex_ids"
+  c_igraphhaskell_graph_set_vertex_ids :: GraphPtr -> IO ()
+
+setVertexIds :: IGraph (Graph d a) ()
+setVertexIds = runUnsafeIO $ \g -> do
+  g' <- setVertexIds' g
+  return ((),g')
+
+setVertexIds' :: Graph d a -> IO (Graph d a)
+setVertexIds' g = do
+  withGraph_ g $ \gp -> do
+    c_igraphhaskell_graph_set_vertex_ids gp
+    setGraphPointer g gp
+
+foreign import ccall "igraphhaskell_graph_get_vertex_ids"
+  c_igraphhaskell_graph_get_vertex_ids :: GraphPtr -> VectorPtr -> IO CInt
+
+getVertexIds :: Graph d a -> IO (Maybe [Double])
+getVertexIds g = withGraph_ g getVertexIds'
+
+getVertexIds' :: GraphPtr -> IO (Maybe [Double])
+getVertexIds' gp = do
+  v <- newVector 0
+  s <- withVector v $ c_igraphhaskell_graph_get_vertex_ids gp
+  if s == 0
+     then Just `fmap` vectorToList v
+     else return Nothing
 
 
 --------------------------------------------------------------------------------
@@ -68,11 +159,17 @@ newVs = do
   fvp <- newForeignPtr c_igraph_vs_destroy vsp
   return $ VsF fvp
 
-applyVs :: VsIdent a -> VertexSelector a -> IO VsForeignPtr
-applyVs f (Vs vs) = vs f
+--applyVs :: VsIdent a -> VertexSelector a -> IO VsForeignPtr
+--applyVs f (Vs vs) = vs f
 
-withVs :: VsForeignPtr -> (VsPtr -> IO res) -> IO res
-withVs (VsF fvs) = withForeignPtr fvs
+withVs :: VertexSelector a -> (Graph d a) -> (VsPtr -> IO res) -> IO res
+withVs (Vs vs) g f = do
+  fvs <- vs (nodeToId' g)
+  withVs' fvs f
+
+withVs' :: VsForeignPtr -> (VsPtr -> IO res) -> IO res
+withVs' (VsF fp) f = withForeignPtr fp f
+
 
 --------------------------------------------------------------------------------
 -- Vectors
@@ -130,7 +227,7 @@ vectorPtrToList (VectorP fvp) = withForeignPtr fvp $ \vp -> do
 
 edgesToVector :: Graph d a -> IO Vector
 edgesToVector g@(G g') =
-  listToVector $ Set.foldr (\e r -> toId (edgeFrom e) : toId (edgeTo e) : r) [] (edges g)
+  listToVector $ Set.foldr (\e r -> toId (edgeFrom e) : toId (edgeTo e) : r) [] (edges' g)
  where
   toId n | Just i <- Map.lookup n (graphNodeToId g') = i
          | otherwise = error "edgesToVector: Graph node/ID mismatch."
@@ -142,11 +239,11 @@ vectorToEdges g@(G _) v = do
 
 vectorToVertices :: Graph d a -> Vector -> IO [a]
 vectorToVertices g@(G _) v = do
-  fmap (map (idToNode' g . round)) (vectorToList v)
+  fmap (map (idToNode'' g . round)) (vectorToList v)
 
 vectorPtrToVertices :: Graph d a -> VectorP -> IO [[a]]
 vectorPtrToVertices g@(G _) v = do
-  fmap (map (map (idToNode' g . round))) (vectorPtrToList v)
+  fmap (map (map (idToNode'' g . round))) (vectorPtrToList v)
 
 --------------------------------------------------------------------------------
 -- Matrices
@@ -196,7 +293,7 @@ matrixToList m = withMatrix m $ \mp -> do
   ncol <- c_igraph_matrix_ncol mp
   forM [0..nrow-1] $ \r -> do
     v  <- newVector (fromIntegral ncol)
-    _e <-withVector v $ \vp ->
+    _e <- withVector v $ \vp ->
       c_igraph_matrix_get_row mp vp r
     vectorToList v
     
@@ -215,25 +312,10 @@ withVector (Vector fvp) = withForeignPtr fvp
 withVectorPtr :: VectorP -> (VectorPtrPtr -> IO a) -> IO a
 withVectorPtr (VectorP fvp) = withForeignPtr fvp
 
-withGraph :: Graph d a -> (GraphPtr -> IO res) -> IO (res, Graph d a)
-withGraph g@(G g') io
-  | Just fp <- graphForeignPtr g' = fmap (,g) (withForeignPtr fp io)
-  | otherwise                     = do
-    v <- edgesToVector g
-    withVector v $ \vp -> do
-    gp <- c_igraph_create vp (if isDirected g then 1 else 0)
-    fp <- newForeignPtr c_igraph_destroy gp
-    res <- withForeignPtr fp io
-    return (res, G g'{ graphForeignPtr = Just fp })
-
-withGraph_ :: Graph d a -> (GraphPtr -> IO res) -> IO res
-withGraph_ g io = fmap fst $ withGraph g io
-
 
 --------------------------------------------------------------------------------
 -- Foreign imports
 
-foreign import ccall "c_igraph_create"                    c_igraph_create                     :: VectorPtr -> CInt -> IO GraphPtr
 foreign import ccall "&c_igraph_destroy"                  c_igraph_destroy                    :: FunPtr (GraphPtr  -> IO ())
 
 foreign import ccall "c_igraph_vector_create"             c_igraph_vector_create              :: CLong -> IO VectorPtr

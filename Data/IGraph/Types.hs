@@ -1,6 +1,6 @@
 {-# LANGUAGE MultiParamTypeClasses, FlexibleContexts, FlexibleInstances,
              TypeFamilies, GADTs, EmptyDataDecls, UndecidableInstances,
-             EmptyDataDecls
+             EmptyDataDecls, GeneralizedNewtypeDeriving
              #-}
 
 module Data.IGraph.Types where
@@ -8,6 +8,7 @@ module Data.IGraph.Types where
 import Data.Hashable
 import Data.HashMap.Strict (HashMap)
 import Data.HashSet (HashSet)
+import Control.Monad.State
 
 import Foreign.Ptr
 import Foreign.ForeignPtr
@@ -48,6 +49,9 @@ newtype VsForeignPtr     = VsF { unVsF :: ForeignPtr Vs }
 -- @Gr d a@ class constraint.
 data Graph d a where
   G :: Gr d a => G d a -> Graph d a
+
+unG :: Graph d a -> G d a
+unG (G g) = g
 
 instance (Show (Edge d a)) => Show (Graph d a) where
   show (G g) = show (graphEdges g)
@@ -108,3 +112,9 @@ instance Hashable a => Hashable (Edge D a) where
 
 instance Show a => Show (Edge D a) where
   show (D_Edge a b) = "Edge D {" ++ show a ++ " -> " ++ show b ++ "}"
+
+--------------------------------------------------------------------------------
+-- Monads
+
+newtype IGraph s r = IGraph { unIGraph :: State s r }
+  deriving (Monad, MonadState s)
