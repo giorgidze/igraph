@@ -30,7 +30,6 @@ Library
   Exposed-modules:
     Data.IGraph
   Other-modules:
-    Data.IGraph.Basics
     Data.IGraph.Internal
     Data.IGraph.Internal.Constants
     Data.IGraph.Types

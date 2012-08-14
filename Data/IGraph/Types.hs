@@ -13,11 +13,12 @@ import Control.Monad.State
 import Foreign.Ptr
 import Foreign.ForeignPtr
 
+import Data.IGraph.Internal.Constants
 
 --------------------------------------------------------------------------------
 -- C stuff
 
-type GraphPtr = Ptr ()
+type GraphPtr d a = Ptr (Graph d a)
 
 
 data Vec
@@ -34,13 +35,8 @@ newtype Matrix    = Matrix    { unM  :: ForeignPtr Mat }
 data Vs
 type VsPtr     = Ptr Vs
 type VsIdent a = (a -> Maybe Int)
+newtype VsForeignPtr = VsF { unVsF :: ForeignPtr Vs }
 
--- | The Haskell representation of vertex selectors. The type variable @a@ has
--- to match the type used in your graph @Graph d a@ when applying the vertex
--- selector. If you supply nodes in your vertex selector which aren't available
--- in the corresponding graph, `vsNone' is used as fallback.
-newtype VertexSelector a = Vs  { unVs  :: VsIdent a -> IO VsForeignPtr }
-newtype VsForeignPtr     = VsF { unVsF :: ForeignPtr Vs }
 
 --------------------------------------------------------------------------------
 -- Graph representation
@@ -53,20 +49,18 @@ data Graph d a where
 unG :: Graph d a -> G d a
 unG (G g) = g
 
-instance (Show (Edge d a)) => Show (Graph d a) where
-  show (G g) = show (graphEdges g)
-
-instance (Eq (Edge d a)) => Eq (Graph d a) where
-  (G g1) == (G g2) = graphEdges g1 == graphEdges g2
-
 -- | The internal graph representation.
-data G d a = Graph { graphNodeNumber        :: !(Int)
-                   , graphEdgeNumber        :: !(Int)
-                   , graphIdToNode          :: !(HashMap Int a)
-                   , graphNodeToId          :: !(HashMap a Int)
-                   , graphEdges             :: !(HashSet (Edge d a))
-                   , graphForeignPtr        :: !(Maybe (ForeignPtr ()))
-                   }
+data G d a
+  = Graph { graphNodeNumber        :: !(Int)
+          , graphEdgeNumber        :: !(Int)
+          , graphIdToNode          :: !(HashMap Int a)
+          , graphNodeToId          :: !(HashMap a Int)
+          , graphEdges             :: !(HashSet (Edge d a))
+          , graphForeignPtr        :: !(Maybe (ForeignPtr (Graph d a)))
+          }
+  | ForeignGraph { foreignGraphPtr        :: !(ForeignPtr (Graph d a))
+                 , foreignGraphIdToNode   :: !(HashMap Int a)
+                 }
 
 -- | Class for graph edges, particularly for undirected edges @Edge U a@ and
 -- directed edges @Edge D a@.
@@ -120,3 +114,14 @@ instance Show a => Show (Edge D a) where
 -- keep track of associated C structures for increased performance.
 newtype IGraph s r = IGraph { unIGraph :: State s r }
   deriving (Monad, MonadState s)
+
+--------------------------------------------------------------------------------
+-- Vertex selectors
+
+data VertexSelector a
+  = VsAll
+  | VsNone
+  | Vs1      a
+  | VsList   [a]
+  | VsAdj    a NeiMode
+  | VsNonAdj a NeiMode
