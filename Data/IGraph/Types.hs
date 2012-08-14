@@ -46,9 +46,9 @@ newtype VsForeignPtr     = VsF { unVsF :: ForeignPtr Vs }
 -- Graph representation
 
 -- | The internal graph representation wrapped into a GADT to carry around the
--- @Gr d a@ class constraint.
+-- @E d a@ class constraint.
 data Graph d a where
-  G :: Gr d a => G d a -> Graph d a
+  G :: E d a => G d a -> Graph d a
 
 unG :: Graph d a -> G d a
 unG (G g) = g
@@ -68,9 +68,9 @@ data G d a = Graph { graphNodeNumber        :: !(Int)
                    , graphForeignPtr        :: !(Maybe (ForeignPtr ()))
                    }
 
--- | Graph class. Minimal definition: @data Edge d a@ with `Hashable' and `Eq'
--- instances, `toEdge', `edgeFrom', `edgeTo', `isDirected'
-class (Eq a, Hashable a, Eq (Edge d a), Hashable (Edge d a)) => Gr d a where
+-- | Class for graph edges, particularly for undirected edges @Edge U a@ and
+-- directed edges @Edge D a@.
+class (Eq a, Hashable a, Eq (Edge d a), Hashable (Edge d a)) => E d a where
 
   data Edge d a
   toEdge     :: a -> a -> Edge d a
@@ -81,7 +81,7 @@ class (Eq a, Hashable a, Eq (Edge d a), Hashable (Edge d a)) => Gr d a where
 -- | Undirected graph
 data U
 
-instance (Eq a, Hashable a) => Gr U a where
+instance (Eq a, Hashable a) => E U a where
   isDirected _ = False
   data Edge U a = U_Edge a a
   toEdge = U_Edge
@@ -100,7 +100,7 @@ instance Show a => Show (Edge U a) where
 -- | Directed graph
 data D
 
-instance (Eq a, Hashable a) => Gr D a where
+instance (Eq a, Hashable a) => E D a where
   isDirected _ = True
   data Edge D a = D_Edge a a deriving Eq
   toEdge = D_Edge
@@ -116,5 +116,7 @@ instance Show a => Show (Edge D a) where
 --------------------------------------------------------------------------------
 -- Monads
 
+-- | The `IGraph' monad, used with @(Graph d a)@ as state type variable @s@ to
+-- keep track of associated C structures for increased performance.
 newtype IGraph s r = IGraph { unIGraph :: State s r }
   deriving (Monad, MonadState s)

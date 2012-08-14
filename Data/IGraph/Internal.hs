@@ -11,13 +11,14 @@ import qualified Data.HashMap.Strict as Map
 --import Data.HashSet (HashSet)
 import qualified Data.HashSet as Set
 
+import qualified Data.Map as M
+
 import Control.Monad
 import Control.Monad.State
 import Data.IORef
 import Foreign
 import Foreign.C
 
-import Debug.Trace
 
 nodeToId'' :: Graph d a -> a -> Int
 nodeToId'' (G g) n
@@ -48,6 +49,9 @@ evalIGraph g (IGraph ig) = evalState ig g
 
 execIGraph :: Graph d a -> IGraph (Graph d a) r -> Graph d a
 execIGraph g (IGraph ig) = execState ig g
+
+localGraph :: Graph d' a' -> IGraph (Graph d' a') r -> IGraph (Graph d a) r
+localGraph g ig = return $ evalIGraph g ig
 
 foreign import ccall "igraphhaskell_initialize"
   c_igraphhaskell_initialize :: IO CInt
@@ -80,8 +84,7 @@ withGraph f = do
 
 withGraph :: Graph d a -> (GraphPtr -> IO res) -> IO (res, Graph d a)
 withGraph g@(G g') io
-  | Just fp <- graphForeignPtr g' = trace "withGraph: Using ForeignPtr" $
-                                    fmap (,g) (withForeignPtr fp io)
+  | Just fp <- graphForeignPtr g' = fmap (,g) (withForeignPtr fp io)
   | otherwise                     = do
     v <- edgesToVector g
     withVector v $ \vp -> do
@@ -103,13 +106,20 @@ foreign import ccall "edges"
 
 subgraphFromPtr :: Graph d a    -- ^ original graph containing all informations
                                 -- about node labels etc.
-                -> GraphPtr
+                -> GraphPtr     -- ^ new (sub)graph pointer
                 -> IO (Graph d a)
 subgraphFromPtr g@(G _) gp = do
   vpp     <- c_igraph_edges gp
   vp      <- newVectorPtr' vpp
-  [l1,l2] <- vectorPtrToVertices g vp
-  return $ fromList (zip l1 l2)
+  Just is <- getVertexIds' gp
+  [l1,l2] <- vectorPtrToList vp
+  let lookupM = M.fromList $ zip [0..] (map round is)
+      orgId :: Int -> Int
+      orgId i | Just o <- M.lookup i lookupM = o
+              | otherwise = error $ "subgraphFromPtr: Invalid ID " ++ show i
+      getNodes = map (idToNode'' g . orgId . round)
+      ls = zip (getNodes l1) (getNodes l2)
+  return $ fromList ls
 
 --
 -- Graph IDs

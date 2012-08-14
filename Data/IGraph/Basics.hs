@@ -13,10 +13,10 @@ import Control.Monad.State
 
 import Data.IGraph.Types
 
-emptyGraph :: Gr d a => Graph d a
+emptyGraph :: E d a => Graph d a
 emptyGraph = G $ Graph 0 0 Map.empty Map.empty Set.empty Nothing
 
-fromList :: Gr d a => [(a,a)] -> Graph d a
+fromList :: E d a => [(a,a)] -> Graph d a
 fromList = foldl' (\g (a,b) -> insertEdge' (toEdge a b) g) emptyGraph
 
 numberOfNodes :: IGraph (Graph d a) Int

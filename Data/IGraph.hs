@@ -1,8 +1,15 @@
 {-# LANGUAGE PatternGuards, ForeignFunctionInterface #-}
 
+-- | Haskell bindings to the igraph C library.
+--
+-- See <http://igraph.sourceforge.net/doc/html/index.html> in the specified
+-- section for more documentation about a specific function.
 module Data.IGraph
-  ( Graph (..), G, Gr (..), D, U
-  , IGraph, runIGraph, evalIGraph, execIGraph
+  ( -- * Base types
+    Graph (..), {- G, -} E (..), D, U
+
+    -- ** The IGraph monad
+  , IGraph, runIGraph, evalIGraph, execIGraph, localGraph
 
     -- * Construction
   , emptyGraph, fromList
@@ -53,9 +60,6 @@ import qualified Data.Map as Map
 
 import Foreign
 import Foreign.C
-
-import Debug.Trace
-
 
 
 --------------------------------------------------------------------------------
@@ -289,8 +293,7 @@ subgraph vs = do
     withGraph g $ \gp -> do
       withVs vs g $ \vsp ->
         withGraph_ (emptyWithCtxt g) $ \gp' -> do
-          _e <- trace "subgraph: C call" $
-                c_igraph_subgraph gp gp' vsp
+          _e <- c_igraph_subgraph gp gp' vsp
           subgraphFromPtr g gp'
  where
   emptyWithCtxt :: Graph d a -> Graph d a
