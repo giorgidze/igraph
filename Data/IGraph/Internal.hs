@@ -9,16 +9,11 @@
 
 module Data.IGraph.Internal where
 
---import Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as Map
-
 import Data.HashSet (HashSet)
 import qualified Data.HashSet as Set
 
-import qualified Data.Map as M
-
 import Control.Monad
-import Control.Monad.State
 import Data.List
 import Data.IORef
 import Foreign hiding (unsafePerformIO)
@@ -29,12 +24,12 @@ import Data.IGraph.Types
 
 
 nodeToId'' :: Graph d a -> a -> Int
-nodeToId'' (G (toHsG -> g)) n
+nodeToId'' (G g) n
   | Just i <- Map.lookup n (graphNodeToId g) = i
   | otherwise = error $ "nodeToId': Graph node/ID mismatch."
 
 idToNode'' :: Graph d a -> Int -> a
-idToNode'' (G (toHsG -> g)) i
+idToNode'' (G g) i
   | Just n <- Map.lookup i (graphIdToNode g) = n
   | otherwise = error $ "idToNode': Graph ID/node mismatch, ID = " ++ show i
 
@@ -43,139 +38,41 @@ edgeIdToEdge g i
   | i < 0 || i >= Set.size es = error ("edgeIdToEdge: Index " ++ show i ++ " out of bound.")
   | otherwise                 = Set.toList es !! i
  where
-  es = edges' g
-
-
---------------------------------------------------------------------------------
--- IGraph
-
-runIGraph :: Graph d a -> IGraph (Graph d a) r -> (r, Graph d a)
-runIGraph g (IGraph ig) = runState ig g
-
-evalIGraph :: Graph d a -> IGraph (Graph d a) r -> r
-evalIGraph g (IGraph ig) = evalState ig g
-
-execIGraph :: Graph d a -> IGraph (Graph d a) r -> Graph d a
-execIGraph g (IGraph ig) = execState ig g
-
-localGraph :: Graph d' a' -> IGraph (Graph d' a') r -> IGraph (Graph d a) r
-localGraph g ig = return $ evalIGraph g ig
-
-foreign import ccall "igraphhaskell_initialize"
-  c_igraphhaskell_initialize :: IO CInt
-
-initIGraph :: IO ()
-initIGraph = {- (0 ==) -} (const ()) `fmap` c_igraphhaskell_initialize
-
-runUnsafeIO :: (Graph d a -> IO (r, Graph d a)) -> IGraph (Graph d a) r
-runUnsafeIO f = do
-  g <- get
-  (r,g') <- return $ unsafePerformIO $ initIGraph >> f g
-  put g'
-  return r
-
+  es = edges g
 
 --------------------------------------------------------------------------------
 -- Graphs
 
 foreign import ccall "c_igraph_create"
-  c_igraph_create :: VectorPtr -> CInt -> IO (GraphPtr d a)
+  c_igraph_create :: VectorPtr -> CInt -> IO (Ptr Void)
 
-withGraph :: Graph d a -> (GraphPtr d a -> IO res) -> IO (res, Graph d a)
-withGraph g@(G g'@Graph{}) io
-  | Just fp <- graphForeignPtr g' = fmap (,g) (withForeignPtr fp io)
-  | otherwise                     = do
-    v <- edgesToVector g
-    withVector v $ \vp -> do
-      gp  <- c_igraph_create vp (if isDirected g then 1 else 0)
-      fp  <- newForeignPtr c_igraph_destroy gp
-      res <- withForeignPtr fp io
-      return (res, G g'{ graphForeignPtr = Just fp })
-withGraph g@(G ForeignGraph{ foreignGraphPtr = fp }) io
-  = fmap (,g) (withForeignPtr fp io)
+buildForeignGraph :: Graph d a -> Graph d a
+buildForeignGraph g@(G gr) = G (gr {graphForeignPtr = unsafePerformIO io})
+  where
+  io :: IO (ForeignPtr Void)
+  io = do print "foo"; v <- edgesToVector g
+          withVector v $ \vp -> do
+            gp  <- c_igraph_create vp (if isDirected g then 1 else 0)
+            fp  <- newForeignPtr c_igraph_destroy gp
+            return fp
 
-withGraph_ :: Graph d a -> (GraphPtr d a -> IO res) -> IO res
-withGraph_ g io = fmap fst $ withGraph g io
+withGraph :: Graph d a -> (Ptr Void -> IO res) -> IO res
+withGraph (G gr) io = withForeignPtr (graphForeignPtr gr) io
 
-setGraphPointer :: Graph d a -> GraphPtr d a -> IO (Graph d a)
-setGraphPointer (G (toHsG -> g)) gp = do
+setGraphPointer :: Graph d a -> Ptr Void -> IO (Graph d a)
+setGraphPointer (G g) gp = do
   fp <- newForeignPtr c_igraph_destroy gp
-  return $ G g{ graphForeignPtr = Just fp }
-
-
---
--- Graph IDs
---
-
-foreign import ccall "igraphhaskell_graph_set_vertex_ids"
-  c_igraphhaskell_graph_set_vertex_ids :: GraphPtr d a -> IO ()
-
-setVertexIds :: IGraph (Graph d a) ()
-setVertexIds = runUnsafeIO $ \g -> do
-  g' <- setVertexIds' g
-  return ((),g')
-
-setVertexIds' :: Graph d a -> IO (Graph d a)
-setVertexIds' g = do
-  withGraph_ g $ \gp -> do
-    c_igraphhaskell_graph_set_vertex_ids gp
-    setGraphPointer g gp
-
-foreign import ccall "igraphhaskell_graph_get_vertex_ids"
-  c_igraphhaskell_graph_get_vertex_ids :: GraphPtr d a -> VectorPtr -> IO CInt
-
-getVertexIds :: Graph d a -> IO (Maybe [Double])
-getVertexIds g = withGraph_ g getVertexIds'
-
-getVertexIds' :: GraphPtr d a -> IO (Maybe [Double])
-getVertexIds' gp = do
-  v <- newVector 0
-  s <- withVector v $ c_igraphhaskell_graph_get_vertex_ids gp
-  if s == 0
-     then Just `fmap` vectorToList v
-     else return Nothing
+  return $ G g{ graphForeignPtr = fp }
 
 
 foreign import ccall "edges"
   c_igraph_edges :: GraphPtr d a -> IO VectorPtrPtr
 
---------------------------------------------------------------------------------
--- Foreign graphs
-
-foreignGraph :: Graph d a -> ForeignPtr (Graph d a) -> Graph d a
-foreignGraph (G Graph{ graphIdToNode = idtn }) fp =
-  G (ForeignGraph fp idtn)
-foreignGraph (G (ForeignGraph _ idtn)) fp =
-  G (ForeignGraph fp idtn)
-
--- | Turn a foreign graph into a Haskell graph
-toHsG :: E d a => G d a -> G d a
-toHsG g@Graph{} = g
-toHsG ForeignGraph{ foreignGraphIdToNode = idtn, foreignGraphPtr = fp } = unsafePerformIO $ do
-  withForeignPtr fp $ \gp -> do
-    vpp     <- c_igraph_edges gp
-    vp      <- newVectorPtr' vpp
-    [l1,l2] <- vectorPtrToList vp
-    mis <- getVertexIds' gp
-    let G g' = fromList $ case mis of
-                 Nothing -> zip (map (ident . round) l1) (map (ident . round) l2)
-                 Just is ->
-                   let lookupM = M.fromList $ zip [0..] (map round is)
-                       orgId :: Int -> Int
-                       orgId i | Just o <- M.lookup i lookupM = o
-                               | otherwise = error $ "subgraphFromPtr: Invalid ID " ++ show i
-                       getNodes = map (ident . orgId . round)
-                    in zip (getNodes l1) (getNodes l2)
-    return g'
- where
-  ident i | Just n <- Map.lookup i idtn = n
-          | otherwise                   = error $ "Impossible ident from foreign graph at ID " ++ show i ++ "."
-
 instance (Show (Edge d a)) => Show (Graph d a) where
-  show (G (toHsG -> g)) = show (graphEdges g)
+  show (G g) = show (graphEdges g)
 
 instance (Eq (Edge d a)) => Eq (Graph d a) where
-  (G (toHsG -> g1)) == (G (toHsG -> g2)) = graphEdges g1 == graphEdges g2
+  (G g1) == (G g2) = graphEdges g1 == graphEdges g2
 
 --------------------------------------------------------------------------------
 -- Vertex selectors
@@ -364,8 +261,8 @@ vectorPtrToList (VectorP fvp) = withForeignPtr fvp $ \vp -> do
   go [] len
 
 edgesToVector :: Graph d a -> IO Vector
-edgesToVector g@(G (toHsG -> g')) =
-  listToVector $ Set.foldr (\e r -> toId (edgeFrom e) : toId (edgeTo e) : r) [] (edges' g)
+edgesToVector g@(G g') =
+  listToVector $ Set.foldr (\e r -> toId (edgeFrom e) : toId (edgeTo e) : r) [] (edges g)
  where
   toId n | Just i <- Map.lookup n (graphNodeToId g') = i
          | otherwise = error "edgesToVector: Graph node/ID mismatch."
@@ -400,7 +297,7 @@ withVectorPtr (VectorP fvp) = withForeignPtr fvp
 --------------------------------------------------------------------------------
 -- Foreign imports
 
-foreign import ccall "&c_igraph_destroy"                  c_igraph_destroy                    :: FunPtr (GraphPtr d a -> IO ())
+foreign import ccall "&c_igraph_destroy"                  c_igraph_destroy                    :: FunPtr (Ptr Void -> IO ())
 
 
 --------------------------------------------------------------------------------
@@ -424,43 +321,28 @@ forListM_ (a : as) f = (f a) >> (forListM_ as f)
 -- Basics
 
 emptyGraph :: E d a => Graph d a
-emptyGraph = G $ Graph 0 0 Map.empty Map.empty Set.empty Nothing
+emptyGraph = buildForeignGraph $ G (Graph 0 0 Map.empty Map.empty Set.empty undefined)
 
 fromList :: E d a => [(a,a)] -> Graph d a
-fromList = foldl' (\g (a,b) -> insertEdge' (toEdge a b) g) emptyGraph
+fromList = foldl' (\g (a,b) -> insertEdge (toEdge a b) g) emptyGraph
 
-numberOfNodes :: IGraph (Graph d a) Int
-numberOfNodes = gets numberOfNodes'
+numberOfNodes :: Graph d a -> Int
+numberOfNodes (G g) = graphNodeNumber g
 
-numberOfNodes' :: Graph d a -> Int
-numberOfNodes' (G (toHsG -> g)) = graphNodeNumber g
+numberOfEdges :: Graph d a -> Int
+numberOfEdges (G g) = graphEdgeNumber g
 
-numberOfEdges :: IGraph (Graph d a) Int
-numberOfEdges = gets numberOfEdges'
+member :: a -> Graph d a -> Bool
+member a (G g) = a `Map.member` graphNodeToId g
 
-numberOfEdges' :: Graph d a -> Int
-numberOfEdges' (G (toHsG -> g)) = graphEdgeNumber g
+nodeToId :: Graph d a -> a -> Maybe Int
+nodeToId (G g) n = Map.lookup n (graphNodeToId g)
 
-member :: a -> IGraph (Graph d a) Bool
-member a = gets $ member' a
-
-member' :: a -> Graph d a -> Bool
-member' a (G (toHsG -> g)) = a `Map.member` graphNodeToId g
-
-nodeToId :: a -> IGraph (Graph d a) (Maybe Int)
-nodeToId a = gets $ nodeToId' `flip` a
-
-nodeToId' :: Graph d a -> a -> Maybe Int
-nodeToId' (G (toHsG -> g)) n = Map.lookup n (graphNodeToId g)
-
-idToNode :: Int -> IGraph (Graph d a) (Maybe a)
-idToNode i = gets $ idToNode' `flip` i
-
-idToNode' :: Graph d a -> Int -> Maybe a
-idToNode' (G (toHsG -> g)) i = Map.lookup i (graphIdToNode g)
+idToNode :: Graph d a -> Int -> Maybe a
+idToNode (G g) i = Map.lookup i (graphIdToNode g)
 
 -- insertNode :: a -> Graph d a -> Graph d a
--- insertNode n (G (toHsG -> g))
+-- insertNode n (G g)
 --   | n `member` (G g) = G g -- node already in g
 --   | otherwise = G $
 --     g { graphNodeNumber = i
@@ -471,27 +353,20 @@ idToNode' (G (toHsG -> g)) i = Map.lookup i (graphIdToNode g)
 --  where
 --   i = graphNodeNumber g + 1
 
-deleteNode :: a -> IGraph (Graph d a) ()
-deleteNode n = modify $ deleteNode' n
-
-deleteNode' :: a -> Graph d a -> Graph d a
-deleteNode' n (G (toHsG -> g)) = G $
+deleteNode :: a -> Graph d a -> Graph d a
+deleteNode n (G g) = buildForeignGraph $ G $
   case Map.lookup n (graphNodeToId g) of
        Just i  -> g { graphNodeNumber = graphNodeNumber g - 1
                     , graphIdToNode   = Map.delete i (graphIdToNode g)
                     , graphNodeToId   = Map.delete n (graphNodeToId g)
                     , graphEdges      = Set.filter (\e -> edgeFrom e /= n && edgeTo e /= n) (graphEdges g)
-                    , graphForeignPtr = Nothing
                     }
-       Nothing -> g -- node not in graph
+       Nothing -> g
 
-insertEdge :: Edge d a -> IGraph (Graph d a) ()
-insertEdge e = modify $ insertEdge' e
-
-insertEdge' :: Edge d a -> Graph d a -> Graph d a
-insertEdge' e (G (toHsG -> g))
-  | e `Set.member` edges' (G g) || f == t = G g -- edge already in g or invalid edge
-  | otherwise = G $
+insertEdge :: Edge d a -> Graph d a -> Graph d a
+insertEdge e (G g)
+  | e `Set.member` edges (G g) || f == t = G g
+  | otherwise = buildForeignGraph $ G $
     case (Map.member f (graphNodeToId g), Map.member t (graphNodeToId g)) of
          (True,  True)  -> insertEdge'' ((G g))
          (False, True)  -> insertEdge'' (insertNode f i (G g))
@@ -504,7 +379,6 @@ insertEdge' e (G (toHsG -> g))
   insertEdge'' (G g') =
     g' { graphEdgeNumber = graphEdgeNumber g' + 1
        , graphEdges      = Set.insert e (graphEdges g')
-       , graphForeignPtr = Nothing
        }
 
   insertNode :: a -> Int -> Graph d a -> Graph d a
@@ -513,42 +387,29 @@ insertEdge' e (G (toHsG -> g))
        , graphIdToNode   = Map.insert ni n  (graphIdToNode g')
        , graphNodeToId   = Map.insert n  ni (graphNodeToId g') }
 
-deleteEdge :: Edge d a -> IGraph (Graph d a) ()
-deleteEdge e = modify $ deleteEdge' e
-
-deleteEdge' :: Edge d a -> Graph d a -> Graph d a
-deleteEdge' e (G (toHsG -> g))
-  | Set.member e (graphEdges g) = deleteNodes $ G $
+deleteEdge :: Edge d a -> Graph d a -> Graph d a
+deleteEdge e (G g)
+  | Set.member e (graphEdges g) = buildForeignGraph $ deleteNodes $ G $
     g { graphEdges      = Set.delete e (graphEdges g)
       , graphEdgeNumber = graphEdgeNumber g - 1
-      , graphForeignPtr = Nothing
       }
   | otherwise = G g
  where
   (f,t) = (edgeFrom e, edgeTo e)
   deleteNodes g' =
-    let delF = if Set.null (neighbours' f g') then deleteNode' f else id
-        delT = if Set.null (neighbours' t g') then deleteNode' t else id
+    let delF = if Set.null (neighbours f g') then deleteNode f else id
+        delT = if Set.null (neighbours t g') then deleteNode t else id
      in delT . delF $ g'
 
-nodes :: IGraph (Graph d a) (HashSet a)
-nodes = gets nodes'
+nodes :: Graph d a -> HashSet a
+nodes (G g) = Set.fromList $ Map.keys $ graphNodeToId g
 
-nodes' :: Graph d a -> HashSet a
-nodes' (G (toHsG -> g)) = Set.fromList $ Map.keys $ graphNodeToId g
+edges :: Graph d a -> HashSet (Edge d a)
+edges (G g) = graphEdges g
 
-edges :: IGraph (Graph d a) (HashSet (Edge d a))
-edges = gets edges'
-
-edges' :: Graph d a -> HashSet (Edge d a)
-edges' (G (toHsG -> g)) = graphEdges g
-
-neighbours :: a -> IGraph (Graph d a) (HashSet a)
-neighbours n = gets $ neighbours' n
-
-neighbours' :: a -> Graph d a -> HashSet a
-neighbours' n g@(G _) =
-  Set.foldr neighbours'' Set.empty (edges' g)
+neighbours :: a -> Graph d a -> HashSet a
+neighbours n g@(G _) =
+  Set.foldr neighbours'' Set.empty (edges g)
  where
   neighbours'' e r
     | edgeFrom e == n                       = Set.insert (edgeTo   e) r

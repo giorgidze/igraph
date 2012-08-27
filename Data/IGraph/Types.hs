@@ -8,7 +8,6 @@ module Data.IGraph.Types where
 import Data.Hashable
 import Data.HashMap.Strict (HashMap)
 import Data.HashSet (HashSet)
-import Control.Monad.State
 
 import Foreign.Ptr
 import Foreign.ForeignPtr
@@ -18,8 +17,9 @@ import Data.IGraph.Internal.Constants
 --------------------------------------------------------------------------------
 -- C stuff
 
-type GraphPtr d a = Ptr (Graph d a)
+data Void
 
+type GraphPtr d a = Ptr (Graph d a)
 
 data Vec
 type VectorPtr    = Ptr Vec
@@ -56,11 +56,8 @@ data G d a
           , graphIdToNode          :: !(HashMap Int a)
           , graphNodeToId          :: !(HashMap a Int)
           , graphEdges             :: !(HashSet (Edge d a))
-          , graphForeignPtr        :: !(Maybe (ForeignPtr (Graph d a)))
+          , graphForeignPtr        ::  (ForeignPtr Void)
           }
-  | ForeignGraph { foreignGraphPtr        :: !(ForeignPtr (Graph d a))
-                 , foreignGraphIdToNode   :: !(HashMap Int a)
-                 }
 
 -- | Class for graph edges, particularly for undirected edges @Edge U a@ and
 -- directed edges @Edge D a@.
@@ -106,14 +103,6 @@ instance Hashable a => Hashable (Edge D a) where
 
 instance Show a => Show (Edge D a) where
   show (D_Edge a b) = "Edge D {" ++ show a ++ " -> " ++ show b ++ "}"
-
---------------------------------------------------------------------------------
--- Monads
-
--- | The `IGraph' monad, used with @(Graph d a)@ as state type variable @s@ to
--- keep track of associated C structures for increased performance.
-newtype IGraph s r = IGraph { unIGraph :: State s r }
-  deriving (Monad, MonadState s)
 
 --------------------------------------------------------------------------------
 -- Vertex selectors
