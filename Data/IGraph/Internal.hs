@@ -21,8 +21,9 @@ import Control.Monad
 import Control.Monad.State
 import Data.List
 import Data.IORef
-import Foreign
+import Foreign hiding (unsafePerformIO)
 import Foreign.C
+import System.IO.Unsafe (unsafePerformIO)
 
 import Data.IGraph.Types
 
