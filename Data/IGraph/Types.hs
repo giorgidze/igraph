@@ -57,7 +57,6 @@ data G d a
 -- | Class for graph edges, particularly for undirected edges @Edge U a@ and
 -- directed edges @Edge D a@.
 class (Eq a, Hashable a, Eq (Edge d a), Hashable (Edge d a)) => E d a where
-
   data Edge d a
   toEdge     :: a -> a -> Edge d a
   edgeFrom   :: Edge d a -> a

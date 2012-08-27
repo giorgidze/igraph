@@ -11,8 +11,10 @@ Build-type:           Simple
 Cabal-version:        >=1.2
 
 Library
-  GHC-options:        -Wall -O3 -funbox-strict-fields 
-  CC-options:         -Wall -O3
+  GHC-options:
+    -Wall -O3 -funbox-strict-fields 
+  CC-options:
+    -Wall -O3
   Build-depends:
     base >= 4.3.1.0,
     unordered-containers,
@@ -24,8 +26,7 @@ Library
     GADTs,
     TypeFamilies,
     FlexibleContexts,
-    FlexibleInstances,
-    UndecidableInstances
+    FlexibleInstances
   Extra-Libraries:
     igraph
   C-Sources:

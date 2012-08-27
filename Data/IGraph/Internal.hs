@@ -59,10 +59,16 @@ setGraphPointer (G g) gp = do
 foreign import ccall "edges"
   c_igraph_edges :: GraphPtr d a -> IO VectorPtrPtr
 
-instance (Show (Edge d a)) => Show (Graph d a) where
+instance (Show a) => Show (Graph U a) where
   show (G g) = show (graphEdges g)
 
-instance (Eq (Edge d a)) => Eq (Graph d a) where
+instance (Show a) => Show (Graph D a) where
+  show (G g) = show (graphEdges g)
+
+instance Eq (Graph U a) where
+  (G g1) == (G g2) = graphEdges g1 == graphEdges g2
+
+instance Eq (Graph D a) where
   (G g1) == (G g2) = graphEdges g1 == graphEdges g2
 
 --------------------------------------------------------------------------------
