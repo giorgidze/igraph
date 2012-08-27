@@ -15,9 +15,6 @@ Library
   CC-options:         -Wall -O3
   Build-depends:
     base >= 4.3.1.0,
-    bytestring,
-    containers,
-    mtl,
     unordered-containers,
     hashable
   Extensions:
@@ -29,7 +26,6 @@ Library
     FlexibleContexts,
     FlexibleInstances,
     UndecidableInstances
-    
   Extra-Libraries:
     igraph
   C-Sources:
