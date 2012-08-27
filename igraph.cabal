@@ -20,6 +20,16 @@ Library
     mtl,
     unordered-containers,
     hashable
+  Extensions:
+    ForeignFunctionInterface,
+    EmptyDataDecls,
+    MultiParamTypeClasses,
+    GADTs,
+    TypeFamilies,
+    FlexibleContexts,
+    FlexibleInstances,
+    UndecidableInstances
+    
   Extra-Libraries:
     igraph
   C-Sources:

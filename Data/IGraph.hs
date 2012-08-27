@@ -1,5 +1,3 @@
-{-# LANGUAGE PatternGuards, ForeignFunctionInterface #-}
-
 -- | Haskell bindings to the igraph C library.
 --
 -- See <http://igraph.sourceforge.net/doc/html/index.html> in the specified

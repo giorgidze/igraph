@@ -1,8 +1,3 @@
-{-# LANGUAGE MultiParamTypeClasses, FlexibleContexts, FlexibleInstances,
-             TypeFamilies, GADTs, EmptyDataDecls, UndecidableInstances,
-             EmptyDataDecls, GeneralizedNewtypeDeriving
-             #-}
-
 module Data.IGraph.Types where
 
 import Data.Hashable

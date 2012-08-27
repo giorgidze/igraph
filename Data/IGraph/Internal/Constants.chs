@@ -1,7 +1,4 @@
-{-# LANGUAGE CPP, ForeignFunctionInterface #-}
-{-# OPTIONS -fno-warn-overlapping-patterns
-            -fspec-constr-count=6
-            #-}
+{-# OPTIONS -fno-warn-overlapping-patterns -fspec-constr-count=6 #-}
 
 module Data.IGraph.Internal.Constants where
 

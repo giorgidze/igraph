@@ -1,9 +1,3 @@
-{-# LANGUAGE ForeignFunctionInterface #-}
-{-# LANGUAGE PatternGuards #-}
-{-# LANGUAGE TupleSections #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE UndecidableInstances #-}
-
 {-# OPTIONS -fno-warn-orphans #-}
 
 module Data.IGraph.Internal where
@@ -21,16 +15,15 @@ import System.IO.Unsafe (unsafePerformIO)
 
 import Data.IGraph.Types
 
-
 nodeToId'' :: Graph d a -> a -> Int
-nodeToId'' (G g) n
-  | Just i <- Map.lookup n (graphNodeToId g) = i
-  | otherwise = error "nodeToId': Graph node/ID mismatch."
+nodeToId'' (G g) n = case Map.lookup n (graphNodeToId g) of
+  Just i  -> i
+  Nothing -> error "nodeToId': Graph node/ID mismatch."
 
 idToNode'' :: Graph d a -> Int -> a
-idToNode'' (G g) i
-  | Just n <- Map.lookup i (graphIdToNode g) = n
-  | otherwise = error $ "idToNode': Graph ID/node mismatch, ID = " ++ show i
+idToNode'' (G g) i = case Map.lookup i (graphIdToNode g) of
+  Just n  -> n
+  Nothing -> error ("idToNode': Graph ID/node mismatch, ID = " ++ show i)
 
 edgeIdToEdge :: Graph d a -> Int -> Edge d a
 edgeIdToEdge g i
@@ -262,8 +255,9 @@ edgesToVector :: Graph d a -> IO Vector
 edgesToVector g@(G g') =
   listToVector $ Set.foldr (\e r -> toId (edgeFrom e) : toId (edgeTo e) : r) [] (edges g)
  where
-  toId n | Just i <- Map.lookup n (graphNodeToId g') = i
-         | otherwise = error "edgesToVector: Graph node/ID mismatch."
+  toId n = case Map.lookup n (graphNodeToId g') of
+             Just i  -> i
+             Nothing -> error "edgesToVector: Graph node/ID mismatch."
 
 vectorToEdges :: Graph d a -> Vector -> IO [Edge d a]
 vectorToEdges g@(G _) v = do
