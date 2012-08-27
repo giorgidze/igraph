@@ -1,4 +1,4 @@
-{-# OPTIONS -fno-warn-overlapping-patterns -fspec-constr-count=6 #-}
+{-# OPTIONS -fno-warn-overlapping-patterns #-}
 
 module Data.IGraph.Internal.Constants where
 
