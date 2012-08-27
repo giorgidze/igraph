@@ -72,7 +72,7 @@ foreign import ccall "igraph_vs_size"
   c_igraph_vs_size :: Ptr Void -> VsPtr -> Ptr CInt -> IO CInt
 
 vsSize :: Graph d a -> VertexSelector a -> Int
-vsSize g vs = unsafePerformIO $ alloca $ \rp  -> do
+vsSize g vs = unsafePerformIO $ alloca $ \rp  ->
   withGraph g $ \gp ->
     withVs vs g $ \vsp -> do
       _ <- c_igraph_vs_size gp vsp rp
@@ -104,7 +104,7 @@ areConnected :: Graph d a -> a -> a -> Bool
 areConnected g n1 n2 = case (nodeToId g n1, nodeToId g n2) of
   (Just i1, Just i2) -> unsafePerformIO $ withGraph g $ \gp -> alloca $ \bp -> do
      _ <- c_igraph_are_connected gp (fromIntegral i1) (fromIntegral i2) bp
-     peek bp >>= return . (== 1)
+     fmap (== 1) (peek bp)
   _ -> False
 
 --------------------------------------------------------------------------------

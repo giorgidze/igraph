@@ -51,12 +51,12 @@ unG (G g) = g
 
 -- | The internal graph representation.
 data G d a
-  = Graph { graphNodeNumber        :: !(Int)
-          , graphEdgeNumber        :: !(Int)
+  = Graph { graphNodeNumber        :: !Int
+          , graphEdgeNumber        :: !Int
           , graphIdToNode          :: !(HashMap Int a)
           , graphNodeToId          :: !(HashMap a Int)
           , graphEdges             :: !(HashSet (Edge d a))
-          , graphForeignPtr        ::  (ForeignPtr Void)
+          , graphForeignPtr        :: ForeignPtr Void
           }
 
 -- | Class for graph edges, particularly for undirected edges @Edge U a@ and

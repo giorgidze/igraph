@@ -1,7 +1,6 @@
 {-# LANGUAGE ForeignFunctionInterface #-}
 {-# LANGUAGE PatternGuards #-}
 {-# LANGUAGE TupleSections #-}
-{-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE UndecidableInstances #-}
 
@@ -26,7 +25,7 @@ import Data.IGraph.Types
 nodeToId'' :: Graph d a -> a -> Int
 nodeToId'' (G g) n
   | Just i <- Map.lookup n (graphNodeToId g) = i
-  | otherwise = error $ "nodeToId': Graph node/ID mismatch."
+  | otherwise = error "nodeToId': Graph node/ID mismatch."
 
 idToNode'' :: Graph d a -> Int -> a
 idToNode'' (G g) i
@@ -53,11 +52,10 @@ buildForeignGraph g@(G gr) = G (gr {graphForeignPtr = unsafePerformIO io})
   io = do print "foo"; v <- edgesToVector g
           withVector v $ \vp -> do
             gp  <- c_igraph_create vp (if isDirected g then 1 else 0)
-            fp  <- newForeignPtr c_igraph_destroy gp
-            return fp
+            newForeignPtr c_igraph_destroy gp
 
 withGraph :: Graph d a -> (Ptr Void -> IO res) -> IO res
-withGraph (G gr) io = withForeignPtr (graphForeignPtr gr) io
+withGraph (G gr) = withForeignPtr (graphForeignPtr gr)
 
 setGraphPointer :: Graph d a -> Ptr Void -> IO (Graph d a)
 setGraphPointer (G g) gp = do
@@ -113,7 +111,7 @@ foreign import ccall "igraph_vs_seq"
   c_igraph_vs_seq :: VsPtr -> CInt -> CInt -> IO CInt
 -}
 
-withVs :: VertexSelector a -> (Graph d a) -> (VsPtr -> IO res) -> IO res
+withVs :: VertexSelector a -> Graph d a -> (VsPtr -> IO res) -> IO res
 withVs vs g f = do
   fvs <- newVs
   -- bind to C vertex selector pointer
@@ -133,7 +131,7 @@ withVs vs g f = do
   ident a = fromIntegral (nodeToId'' g a) :: CInt
 
 withVs' :: VsForeignPtr -> (VsPtr -> IO res) -> IO res
-withVs' (VsF fp) f = withForeignPtr fp f
+withVs' (VsF fp) = withForeignPtr fp
 
 
 --------------------------------------------------------------------------------
@@ -273,12 +271,10 @@ vectorToEdges g@(G _) v = do
   return $ map (edgeIdToEdge g . round) l
 
 vectorToVertices :: Graph d a -> Vector -> IO [a]
-vectorToVertices g@(G _) v = do
-  fmap (map (idToNode'' g . round)) (vectorToList v)
+vectorToVertices g@(G _) v = fmap (map (idToNode'' g . round)) (vectorToList v)
 
 vectorPtrToVertices :: Graph d a -> VectorP -> IO [[a]]
-vectorPtrToVertices g@(G _) v = do
-  fmap (map (map (idToNode'' g . round))) (vectorPtrToList v)
+vectorPtrToVertices g@(G _) v = fmap (map (map (idToNode'' g . round))) (vectorPtrToList v)
 
 
 --------------------------------------------------------------------------------
@@ -305,7 +301,7 @@ foreign import ccall "&c_igraph_destroy"                  c_igraph_destroy      
 
 forListM_ :: [a] -> (a -> IO b) -> IO ()
 forListM_ []       _ = return ()
-forListM_ (a : as) f = (f a) >> (forListM_ as f)
+forListM_ (a : as) f = f a >> forListM_ as f
 
 -- forListM :: [a] -> (a -> IO b) -> IO [b]
 -- forListM = go []
@@ -368,7 +364,7 @@ insertEdge e (G g)
   | e `Set.member` edges (G g) || f == t = G g
   | otherwise = buildForeignGraph $ G $
     case (Map.member f (graphNodeToId g), Map.member t (graphNodeToId g)) of
-         (True,  True)  -> insertEdge'' ((G g))
+         (True,  True)  -> insertEdge'' (G g)
          (False, True)  -> insertEdge'' (insertNode f i (G g))
          (True,  False) -> insertEdge'' (insertNode t i (G g))
          (False, False) -> insertEdge'' (insertNode t (i+1) $ insertNode f i (G g))
