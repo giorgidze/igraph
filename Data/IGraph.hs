@@ -144,6 +144,48 @@ shortestPaths g vf vt m =
  where
   roundMaybe d = if d == 1/0 then Nothing else Just (round d)
 
+{-- TODO:
+
+2.2. igraph_shortest_paths_dijkstra — Weighted shortest paths from some sources.
+
+  int igraph_shortest_paths_dijkstra(const igraph_t *graph,
+                                     igraph_matrix_t *res,
+                                     const igraph_vs_t from,
+                                     const igraph_vs_t to,
+                                     const igraph_vector_t *weights, 
+                                     igraph_neimode_t mode);
+
+2.3. igraph_shortest_paths_bellman_ford — Weighted shortest paths from some sources allowing negative weights.
+
+  int igraph_shortest_paths_bellman_ford(const igraph_t *graph,
+                                         igraph_matrix_t *res,
+                                         const igraph_vs_t from,
+                                         const igraph_vs_t to,
+                                         const igraph_vector_t *weights, 
+                                         igraph_neimode_t mode);
+
+2.4. igraph_shortest_paths_johnson — Calculate shortest paths from some sources using Johnson's algorithm.
+
+  int igraph_shortest_paths_johnson(const igraph_t *graph,
+                                    igraph_matrix_t *res,
+                                    const igraph_vs_t from,
+                                    const igraph_vs_t to,
+                                    const igraph_vector_t *weights);
+
+2.5. igraph_get_shortest_paths — Calculates the shortest paths from/to one vertex.
+
+  int igraph_get_shortest_paths(const igraph_t *graph, 
+                                igraph_vector_ptr_t *vertices,
+                                igraph_vector_ptr_t *edges,
+                                igraph_integer_t from, const igraph_vs_t to, 
+                                igraph_neimode_t mode);
+
+2.6. igraph_get_shortest_path — Shortest path from one vertex to another one.
+
+  done:
+
+-}
+
 foreign import ccall "igraph_get_shortest_path"
   c_igraph_get_shortest_path :: Ptr Void -> VectorPtr -> VectorPtr -> CInt -> CInt -> CInt -> IO CInt
 
@@ -166,6 +208,91 @@ getShortestPath g n1 n2 m =
                    error $ "getShortestPath: igraph error " ++ show e
            _ -> error "getShortestPath: Invalid nodes"
 
+{-
+
+2.7. igraph_get_shortest_paths_dijkstra — Calculates the weighted shortest paths from/to one vertex.
+
+  int igraph_get_shortest_paths_dijkstra(const igraph_t *graph,
+                                         igraph_vector_ptr_t *vertices,
+                                         igraph_vector_ptr_t *edges,
+                                         igraph_integer_t from,
+                                         igraph_vs_t to,
+                                         const igraph_vector_t *weights,
+                                         igraph_neimode_t mode);
+
+2.8. igraph_get_shortest_path_dijkstra — Weighted shortest path from one vertex to another one.
+
+  int igraph_get_shortest_path_dijkstra(const igraph_t *graph,
+                                        igraph_vector_t *vertices,
+                                        igraph_vector_t *edges,
+                                        igraph_integer_t from,
+                                        igraph_integer_t to,
+                                        const igraph_vector_t *weights,
+                                        igraph_neimode_t mode);
+
+2.9. igraph_get_all_shortest_paths — Finds all shortest paths (geodesics) from a vertex to all other vertices.
+
+  int igraph_get_all_shortest_paths(const igraph_t *graph,
+                                    igraph_vector_ptr_t *res, 
+                                    igraph_vector_t *nrgeo,
+                                    igraph_integer_t from, const igraph_vs_t to,
+                                    igraph_neimode_t mode);
+
+2.10. igraph_get_all_shortest_paths_dijkstra — Finds all shortest paths (geodesics) from a vertex to all other vertices.
+
+  int igraph_get_all_shortest_paths_dijkstra(const igraph_t *graph,
+                                             igraph_vector_ptr_t *res, 
+                                             igraph_vector_t *nrgeo,
+                                             igraph_integer_t from, igraph_vs_t to,
+                                             const igraph_vector_t *weights,
+                                             igraph_neimode_t mode);
+
+2.11. igraph_average_path_length — Calculates the average geodesic length in a graph.
+
+  int igraph_average_path_length(const igraph_t *graph, igraph_real_t *res,
+                                 igraph_bool_t directed, igraph_bool_t unconn);
+
+2.12. igraph_path_length_hist — Create a histogram of all shortest path lengths.
+
+  int igraph_path_length_hist(const igraph_t *graph, igraph_vector_t *res,
+                              igraph_real_t *unconnected, igraph_bool_t directed);
+
+2.13. igraph_diameter — Calculates the diameter of a graph (longest geodesic).
+
+  int igraph_diameter(const igraph_t *graph, igraph_integer_t *pres, 
+                      igraph_integer_t *pfrom, igraph_integer_t *pto, 
+                      igraph_vector_t *path,
+                      igraph_bool_t directed, igraph_bool_t unconn);
+
+2.14. igraph_diameter_dijkstra — Weighted diameter using Dijkstra's algorithm, non-negative weights only.
+
+  int igraph_diameter_dijkstra(const igraph_t *graph,
+                               const igraph_vector_t *weights,
+                               igraph_real_t *pres,
+                               igraph_integer_t *pfrom,
+                               igraph_integer_t *pto,
+                               igraph_vector_t *path,
+                               igraph_bool_t directed,
+                               igraph_bool_t unconn);
+
+2.15. igraph_girth — The girth of a graph is the length of the shortest circle in it.
+
+int igraph_girth(const igraph_t *graph, igraph_integer_t *girth, 
+                 igraph_vector_t *circle);
+
+2.16. igraph_eccentricity — Eccentricity of some vertices
+
+  int igraph_eccentricity(const igraph_t *graph, 
+                          igraph_vector_t *res,
+                          igraph_vs_t vids,
+                          igraph_neimode_t mode);
+
+2.17. igraph_radius — Radius of a graph
+
+  int igraph_radius(const igraph_t *graph, igraph_real_t *radius, 
+                    igraph_neimode_t mode);
+
+-}
 
 --------------------------------------------------------------------------------
 -- 13.3 Neighborhood of a vertex
