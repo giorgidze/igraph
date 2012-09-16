@@ -297,7 +297,20 @@ int igraph_girth(const igraph_t *graph, igraph_integer_t *girth,
 --------------------------------------------------------------------------------
 -- 13.3 Neighborhood of a vertex
 
+{- TODO:
+
+3.1. igraph_neighborhood_size — Calculates the size of the neighborhood of a given vertex.
+
+  int igraph_neighborhood_size(const igraph_t *graph, igraph_vector_t *res,
+                               igraph_vs_t vids, igraph_integer_t order,
+                               igraph_neimode_t mode);
+
+3.2. igraph_neighborhood — Calculate the neighborhood of vertices.
+
+  DONE:
+
 {-
+
 foreign import ccall "neighborhood"
   c_igraph_neighborhood :: GraphPtr d a -> VectorPtrPtr -> VsPtr -> CInt -> CInt -> IO CInt
 
@@ -308,6 +321,15 @@ neighborhood vs o m = runUnsafeIO $ \g -> do
     c_igraph_neighborhood gp vp vsp (fromIntegral o) (fromIntegral (fromEnum m))
   ids      <- vectorPtrToList v
   return (map (map (idToNode'' g . round)) ids, g')
+
+-}
+
+3.3. igraph_neighborhood_graphs — Create graphs from the neighborhood(s) of some vertex/vertices.
+
+  int igraph_neighborhood_graphs(const igraph_t *graph, igraph_vector_ptr_t *res,
+                                 igraph_vs_t vids, igraph_integer_t order,
+                                 igraph_neimode_t mode);
+
 -}
 
 
