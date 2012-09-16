@@ -34,7 +34,7 @@ module Data.IGraph
   , areConnected
 
     -- ** 13\.2 Shortest Path Related Functions
-  -- , shortestPaths, getShortestPath
+  , shortestPaths, getShortestPath
 
     -- ** 13\.4 Graph Components
   , subcomponent
@@ -51,6 +51,10 @@ module Data.IGraph
 import Data.IGraph.Internal
 import Data.IGraph.Internal.Constants
 import Data.IGraph.Types
+
+import Data.Hashable
+import Data.HashMap.Lazy (HashMap)
+import qualified Data.HashMap.Lazy as HML
 
 import Foreign hiding (unsafePerformIO)
 import Foreign.C
@@ -108,43 +112,59 @@ areConnected g n1 n2 = case (nodeToId g n1, nodeToId g n2) of
 --------------------------------------------------------------------------------
 -- 13.2 Shortest Path Related Functions
 
--- foreign import ccall "shortest_paths"
---   c_igraph_shortest_paths :: GraphPtr d a -> MatrixPtr -> VsPtr -> VsPtr -> CInt -> IO CInt
+foreign import ccall "shortest_paths"
+  c_igraph_shortest_paths :: Ptr Void -> MatrixPtr -> VsPtr -> VsPtr -> CInt -> IO CInt
 
--- shortestPaths :: Ord a => VertexSelector a -> VertexSelector a -> NeiMode -> IGraph (Graph d a) (Map a (Map a (Maybe Int)))
--- shortestPaths vf vt m = do
---   l <- runUnsafeIO $ \g -> do
---     ma <- newMatrix 0 0
---     (_e,g') <- withGraph g $ \gp -> withMatrix ma $ \mp -> withVs vf g $ \vfp -> withVs vt g $ \vtp ->
---       c_igraph_shortest_paths gp mp vfp vtp (fromIntegral $ fromEnum m)
---     l <- matrixToList ma
---     return (l,g')
---   nf <- selectedVertices vf
---   nt <- selectedVertices vt
---   return $ Map.fromList . zip nf $ map (Map.fromList . zip nt . map roundMaybe) l
---  where
---   roundMaybe d = if d == 1/0 then Nothing else Just (round d)
--- 
--- foreign import ccall "igraph_get_shortest_path"
---   c_igraph_get_shortest_path :: GraphPtr d a -> VectorPtr -> VectorPtr -> CInt -> CInt -> CInt -> IO CInt
--- 
--- getShortestPath :: a -> a -> NeiMode -> IGraph (Graph d a) ([a],[Edge d a])
--- getShortestPath n1 n2 m = do
---   mi1 <- nodeToId n1
---   mi2 <- nodeToId n2
---   case (mi1, mi2) of
---        (Just i1, Just i2) -> runUnsafeIO $ \g -> withGraph g $ \gp -> do
---          v1 <- listToVector ([] :: [Int])
---          v2 <- listToVector ([] :: [Int])
---          e <- withVector v1 $ \vp1 -> withVector v2 $ \vp2 ->
---               c_igraph_get_shortest_path gp vp1 vp2 (fromIntegral i1) (fromIntegral i2) (fromIntegral (fromEnum m))
---          if e == 0 then do
---             vert <- vectorToVertices g v1
---             edgs <- vectorToEdges    g v2
---             return ( vert, edgs )
---           else
---             error $ "getShortestPath: igraph error " ++ show e
---        _ -> error "getShortestPath: Invalid nodes"
+shortestPaths :: (Ord a, Hashable a)
+              => Graph d a
+              -> VertexSelector a
+              -> VertexSelector a
+              -> NeiMode
+              -> HashMap (a,a) (Maybe Int) -- ^ (lazy) `HashMap'
+shortestPaths g vf vt m =
+  let ls = unsafePerformIO $ do
+             ma <- newMatrix 0 0
+             _e <- withGraph g $ \gp ->
+                   withMatrix ma $ \mp ->
+                   withVs vf g $ \vfp ->
+                   withVs vt g $ \vtp ->
+                     c_igraph_shortest_paths
+                       gp
+                       mp
+                       vfp
+                       vtp
+                       (fromIntegral $ fromEnum m)
+             matrixToList ma
+      nf = selectedVertices g vf
+      nt = selectedVertices g vt
+  in  HML.fromList [ ((f,t), len)
+                   | (f,lf)  <- zip nf ls
+                   , (t,len) <- zip nt (map roundMaybe lf)
+                   ]
+ where
+  roundMaybe d = if d == 1/0 then Nothing else Just (round d)
+
+foreign import ccall "igraph_get_shortest_path"
+  c_igraph_get_shortest_path :: Ptr Void -> VectorPtr -> VectorPtr -> CInt -> CInt -> CInt -> IO CInt
+
+getShortestPath :: Graph d a -> a -> a -> NeiMode -> ([a],[Edge d a])
+getShortestPath g n1 n2 m =
+  let mi1 = nodeToId g n1
+      mi2 = nodeToId g n2
+  in  case (mi1, mi2) of
+           (Just i1, Just i2) -> unsafePerformIO $
+             withGraph g $ \gp -> do
+               v1 <- listToVector ([] :: [Int])
+               v2 <- listToVector ([] :: [Int])
+               e <- withVector v1 $ \vp1 -> withVector v2 $ \vp2 ->
+                     c_igraph_get_shortest_path gp vp1 vp2 (fromIntegral i1) (fromIntegral i2) (fromIntegral (fromEnum m))
+               if e == 0 then do
+                   vert <- vectorToVertices g v1
+                   edgs <- vectorToEdges    g v2
+                   return ( vert, edgs )
+                 else
+                   error $ "getShortestPath: igraph error " ++ show e
+           _ -> error "getShortestPath: Invalid nodes"
 
 
 --------------------------------------------------------------------------------
