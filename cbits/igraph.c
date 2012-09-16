@@ -142,6 +142,24 @@ int shortest_paths(const igraph_t *graph, igraph_matrix_t *res,
     return igraph_shortest_paths(graph, res, *from, *to, mode);
 }
 
+int get_shortest_paths(const igraph_t *graph, 
+                igraph_vector_ptr_t *vertices,
+                igraph_vector_ptr_t *edges,
+                igraph_integer_t from, const igraph_vs_t *to, 
+                igraph_neimode_t mode)
+{
+    return igraph_get_shortest_paths(graph, vertices, edges, from, *to, mode);
+}
+
+int get_all_shortest_paths(const igraph_t *graph,
+                igraph_vector_ptr_t *res, 
+                igraph_vector_t *nrgeo,
+                igraph_integer_t from, const igraph_vs_t *to,
+                igraph_neimode_t mode)
+{
+    return igraph_get_all_shortest_paths(graph, res, nrgeo, from, *to, mode);
+}
+
 /*******************************************************************************
  *
  * 13.3 Neighborhood of a vertex

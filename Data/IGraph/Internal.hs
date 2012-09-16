@@ -57,7 +57,7 @@ setGraphPointer (G g) gp = do
 
 
 foreign import ccall "edges"
-  c_igraph_edges :: GraphPtr d a -> IO VectorPtrPtr
+  c_igraph_edges :: GraphPtr -> IO VectorPtrPtr
 
 instance (Show a) => Show (Graph U a) where
   show (G g) = show (graphEdges g)
@@ -275,6 +275,11 @@ vectorToVertices g@(G _) v = fmap (map (idToNode'' g . round)) (vectorToList v)
 
 vectorPtrToVertices :: Graph d a -> VectorP -> IO [[a]]
 vectorPtrToVertices g@(G _) v = fmap (map (map (idToNode'' g . round))) (vectorPtrToList v)
+
+vectorPtrToEdges :: Graph d a -> VectorP -> IO [[Edge d a]]
+vectorPtrToEdges g@(G _) v = do
+  l <- vectorPtrToList v
+  return $ map (map (edgeIdToEdge g . round)) l
 
 
 --------------------------------------------------------------------------------

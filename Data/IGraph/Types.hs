@@ -14,7 +14,7 @@ import Data.IGraph.Internal.Constants
 
 data Void
 
-type GraphPtr d a = Ptr (Graph d a)
+type GraphPtr = Ptr Void
 
 data Vec
 type VectorPtr    = Ptr Vec

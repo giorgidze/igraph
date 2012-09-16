@@ -34,7 +34,12 @@ module Data.IGraph
   , areConnected
 
     -- ** 13\.2 Shortest Path Related Functions
-  , shortestPaths, getShortestPath
+  , shortestPaths
+  , getShortestPaths
+  , getShortestPath
+  , getAllShortestPaths
+  , averagePathLength
+  , pathLengthHist
 
     -- ** 13\.4 Graph Components
   , subcomponent
@@ -71,7 +76,7 @@ import System.IO.Unsafe (unsafePerformIO)
 -- 11.3. Generic vertex selector operations
 
 foreign import ccall "igraph_vs_size"
-  c_igraph_vs_size :: Ptr Void -> VsPtr -> Ptr CInt -> IO CInt
+  c_igraph_vs_size :: GraphPtr -> VsPtr -> Ptr CInt -> IO CInt
 
 vsSize :: Graph d a -> VertexSelector a -> Int
 vsSize g vs = unsafePerformIO $ alloca $ \rp  ->
@@ -82,7 +87,7 @@ vsSize g vs = unsafePerformIO $ alloca $ \rp  ->
       return (fromIntegral ci)
 
 foreign import ccall "selected_vertices"
-  c_selected_vertices :: Ptr Void -> VsPtr -> VectorPtr -> IO Int
+  c_selected_vertices :: GraphPtr -> VsPtr -> VectorPtr -> IO Int
 
 selectedVertices :: Graph d a -> VertexSelector a -> [a]
 selectedVertices g vs = unsafePerformIO $ do
@@ -100,7 +105,7 @@ selectedVertices g vs = unsafePerformIO $ do
 -- 13.1 Basic properties
 
 foreign import ccall "igraph_are_connected"
-  c_igraph_are_connected :: Ptr Void -> CInt -> CInt -> Ptr CInt -> IO CInt
+  c_igraph_are_connected :: GraphPtr -> CInt -> CInt -> Ptr CInt -> IO CInt
 
 areConnected :: Graph d a -> a -> a -> Bool
 areConnected g n1 n2 = case (nodeToId g n1, nodeToId g n2) of
@@ -113,7 +118,7 @@ areConnected g n1 n2 = case (nodeToId g n1, nodeToId g n2) of
 -- 13.2 Shortest Path Related Functions
 
 foreign import ccall "shortest_paths"
-  c_igraph_shortest_paths :: Ptr Void -> MatrixPtr -> VsPtr -> VsPtr -> CInt -> IO CInt
+  c_igraph_shortest_paths :: GraphPtr -> MatrixPtr -> VsPtr -> VsPtr -> CInt -> IO CInt
 
 shortestPaths :: (Ord a, Hashable a)
               => Graph d a
@@ -174,20 +179,46 @@ shortestPaths g vf vt m =
 
 2.5. igraph_get_shortest_paths — Calculates the shortest paths from/to one vertex.
 
-  int igraph_get_shortest_paths(const igraph_t *graph, 
-                                igraph_vector_ptr_t *vertices,
-                                igraph_vector_ptr_t *edges,
-                                igraph_integer_t from, const igraph_vs_t to, 
-                                igraph_neimode_t mode);
+  DONE: -}
+
+foreign import ccall "get_shortest_paths"
+  c_igraph_get_shortest_paths :: GraphPtr -> VectorPtrPtr -> VectorPtrPtr -> CInt -> VsPtr -> CInt -> IO CInt
+
+getShortestPaths :: Graph d a
+                 -> a                     -- ^ from
+                 -> VertexSelector a      -- ^ to
+                 -> NeiMode
+                 -> [ ([a],[Edge d a]) ]  -- ^ list of @(vertices, edges)@
+getShortestPaths g f vt m =
+  let mfi = nodeToId g f
+   in case mfi of
+           Nothing -> error "getShortestPaths: Invalid node"
+           Just fi -> unsafePerformIO $ do
+             vpv <- newVectorPtr 0
+             vpe <- newVectorPtr 0
+             _e  <- withGraph g $ \gp ->
+                      withVectorPtr vpv $ \vpvp ->
+                      withVectorPtr vpe $ \vpep ->
+                      withVs vt g $ \vtp ->
+                       c_igraph_get_shortest_paths
+                         gp
+                         vpvp
+                         vpep
+                         (fromIntegral fi)
+                         vtp
+                         (fromIntegral $ fromEnum m)
+             v <- vectorPtrToVertices g vpv
+             e <- vectorPtrToEdges    g vpe
+             return $ zip v e
+
+{-
 
 2.6. igraph_get_shortest_path — Shortest path from one vertex to another one.
 
-  done:
-
--}
+  DONE: -}
 
 foreign import ccall "igraph_get_shortest_path"
-  c_igraph_get_shortest_path :: Ptr Void -> VectorPtr -> VectorPtr -> CInt -> CInt -> CInt -> IO CInt
+  c_igraph_get_shortest_path :: GraphPtr -> VectorPtr -> VectorPtr -> CInt -> CInt -> CInt -> IO CInt
 
 getShortestPath :: Graph d a -> a -> a -> NeiMode -> ([a],[Edge d a])
 getShortestPath g n1 n2 m =
@@ -232,11 +263,42 @@ getShortestPath g n1 n2 m =
 
 2.9. igraph_get_all_shortest_paths — Finds all shortest paths (geodesics) from a vertex to all other vertices.
 
-  int igraph_get_all_shortest_paths(const igraph_t *graph,
-                                    igraph_vector_ptr_t *res, 
-                                    igraph_vector_t *nrgeo,
-                                    igraph_integer_t from, const igraph_vs_t to,
-                                    igraph_neimode_t mode);
+  DONE: -}
+
+foreign import ccall "get_all_shortest_paths"
+  c_igraph_get_all_shortest_paths :: GraphPtr
+                                  -> VectorPtrPtr
+                                  -> VectorPtr
+                                  -> CInt
+                                  -> VsPtr
+                                  -> CInt
+                                  -> IO CInt
+
+getAllShortestPaths :: Graph d a
+                    -> a                  -- ^ from
+                    -> VertexSelector a   -- ^ to
+                    -> NeiMode
+                    -> [[a]]  -- ^ list of vertices along the shortest path from
+                              -- @from@ to each other (reachable) vertex
+getAllShortestPaths g f vt m =
+  let mfi = nodeToId g f
+   in case mfi of
+           Nothing -> error "getAllShortestPaths: Invalid node"
+           Just fi -> unsafePerformIO $ do
+             vpr <- newVectorPtr 0
+             _e  <- withGraph g $ \gp ->
+                      withVectorPtr vpr $ \vprp ->
+                      withVs vt g $ \vtp ->
+                        c_igraph_get_all_shortest_paths
+                          gp
+                          vprp 
+                          nullPtr -- NULL
+                          (fromIntegral fi)
+                          vtp
+                          (fromIntegral $ fromEnum m)
+             vectorPtrToVertices g vpr
+
+{-
 
 2.10. igraph_get_all_shortest_paths_dijkstra — Finds all shortest paths (geodesics) from a vertex to all other vertices.
 
@@ -249,13 +311,60 @@ getShortestPath g n1 n2 m =
 
 2.11. igraph_average_path_length — Calculates the average geodesic length in a graph.
 
-  int igraph_average_path_length(const igraph_t *graph, igraph_real_t *res,
-                                 igraph_bool_t directed, igraph_bool_t unconn);
+  DONE: -}
+
+foreign import ccall "igraph_average_path_length"
+  c_igraph_average_path_length :: GraphPtr -> Ptr CDouble -> Bool -> Bool -> IO CInt
+
+averagePathLength :: Graph d a
+                  -> Bool     -- ^ Boolean, whether to consider directed paths. Ignored for undirected graphs.
+                  -> Bool     -- ^ What to do if the graph is not connected. If
+                              -- TRUE the average of the geodesics within the
+                              -- components will be returned, otherwise the
+                              -- number of vertices is used for the length of
+                              -- non-existing geodesics. (The rationale behind
+                              -- this is that this is always longer than the
+                              -- longest possible geodesic in a graph.)
+                  -> Double
+averagePathLength g b1 b2 = unsafePerformIO $ do
+  alloca $ \dp -> do
+    _e <- withGraph g $ \gp ->
+            c_igraph_average_path_length 
+              gp
+              dp
+              b1
+              b2
+    realToFrac `fmap` peek dp
+
+{-
 
 2.12. igraph_path_length_hist — Create a histogram of all shortest path lengths.
 
-  int igraph_path_length_hist(const igraph_t *graph, igraph_vector_t *res,
-                              igraph_real_t *unconnected, igraph_bool_t directed);
+  DONE: -}
+
+foreign import ccall "igraph_path_length_hist"
+  c_igraph_path_length_hist :: GraphPtr -> VectorPtr -> Ptr CDouble -> Bool -> IO CInt
+
+pathLengthHist :: Graph d a
+               -> Bool  -- ^ Whether to consider directed paths in a directed
+                       -- graph (if not zero). This argument is ignored for
+                       -- undirected graphs.
+               -> ([Double],Double)
+pathLengthHist g b = unsafePerformIO $ do
+  v <- newVector 0
+  d <- alloca $ \dp -> do
+    _e <- withGraph g $ \gp ->
+            withVector v $ \vp ->
+             c_igraph_path_length_hist
+               gp
+               vp
+               dp
+               b
+    realToFrac `fmap` peek dp
+  l <- vectorToList v
+  return (l,d)
+
+{-
 
 2.13. igraph_diameter — Calculates the diameter of a graph (longest geodesic).
 
@@ -349,7 +458,7 @@ neighborhood vs o m = runUnsafeIO $ \g -> do
 -}
 
 foreign import ccall "igraph_subcomponent"
-  c_igraph_subcomponent :: Ptr Void -> VectorPtr -> CDouble -> CInt -> IO CInt
+  c_igraph_subcomponent :: GraphPtr -> VectorPtr -> CDouble -> CInt -> IO CInt
 
 subcomponent :: Graph d a -> a -> NeiMode -> [a]
 subcomponent g a m = case nodeToId g a of
@@ -415,7 +524,7 @@ subgraph vs = do
   DONE: -}
 
 foreign import ccall "igraph_is_connected"
-  c_igraph_is_connected :: Ptr Void -> Ptr CInt -> CInt -> IO CInt
+  c_igraph_is_connected :: GraphPtr -> Ptr CInt -> CInt -> IO CInt
 
 isConnected :: Graph d a -> Connectedness -> Bool
 isConnected g c = unsafePerformIO $ withGraph g $ \gp -> alloca $ \b -> do
