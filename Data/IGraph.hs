@@ -309,6 +309,8 @@ int igraph_girth(const igraph_t *graph, igraph_integer_t *girth,
 
   DONE:
 
+-}
+
 {-
 
 foreign import ccall "neighborhood"
@@ -324,6 +326,8 @@ neighborhood vs o m = runUnsafeIO $ \g -> do
 
 -}
 
+{-
+
 3.3. igraph_neighborhood_graphs — Create graphs from the neighborhood(s) of some vertex/vertices.
 
   int igraph_neighborhood_graphs(const igraph_t *graph, igraph_vector_ptr_t *res,
@@ -335,6 +339,14 @@ neighborhood vs o m = runUnsafeIO $ \g -> do
 
 --------------------------------------------------------------------------------
 -- 13.4 Graph Components
+
+{- TODO
+
+4.1. igraph_subcomponent — The vertices in the same component as a given vertex.
+
+  DONE:
+
+-}
 
 foreign import ccall "igraph_subcomponent"
   c_igraph_subcomponent :: Ptr Void -> VectorPtr -> CDouble -> CInt -> IO CInt
@@ -348,28 +360,59 @@ subcomponent g a m = case nodeToId g a of
     vectorToVertices g v
   _ -> []
 
-{- same problem as with `subgraph'
+{-
+
+4.2. igraph_induced_subgraph — Creates a subgraph induced by the specified vertices.
+
+  int igraph_induced_subgraph(const igraph_t *graph, igraph_t *res, 
+                              const igraph_vs_t vids, igraph_subgraph_implementation_t impl);
+
 foreign import ccall "igraph_induced_subcomponent"
   c_igraph_induced_subcomponent :: GraphPtr d a
+
+4.3. igraph_subgraph_edges — Creates a subgraph with the specified edges and their endpoints.
+
+  int igraph_subgraph_edges(const igraph_t *graph, igraph_t *res, 
+                            const igraph_es_t eids, igraph_bool_t delete_vertices);
+
+4.4. igraph_subgraph — Creates a subgraph induced by the specified vertices.
+
+  int igraph_subgraph(const igraph_t *graph, igraph_t *res, 
+                      const igraph_vs_t vids);
+
 -}
 
--- foreign import ccall "subgraph"
---   c_igraph_subgraph :: GraphPtr d a -> GraphPtr d a -> VsPtr -> IO CInt
--- 
--- subgraph :: VertexSelector a -> IGraph (Graph d a) (Graph d a)
--- subgraph vs = do
---   setVertexIds
---   (_e, G Graph{ graphForeignPtr = Just subg }) <- runUnsafeIO $ \g ->
---     withGraph g $ \gp -> do
---       withVs vs g $ \vsp ->
---         withGraph (emptyWithCtxt g) $ \gp' -> do
---           c_igraph_subgraph gp gp' vsp
---   g <- get
---   return $ foreignGraph g subg
---   --return $ G $ ForeignGraph subg (graphIdToNode g)
---  where
---   emptyWithCtxt :: Graph d a -> Graph d a
---   emptyWithCtxt (G _) = emptyGraph
+{-
+foreign import ccall "subgraph"
+  c_igraph_subgraph :: GraphPtr d a -> GraphPtr d a -> VsPtr -> IO CInt
+
+subgraph :: VertexSelector a -> IGraph (Graph d a) (Graph d a)
+subgraph vs = do
+  setVertexIds
+  (_e, G Graph{ graphForeignPtr = Just subg }) <- runUnsafeIO $ \g ->
+    withGraph g $ \gp -> do
+      withVs vs g $ \vsp ->
+        withGraph (emptyWithCtxt g) $ \gp' -> do
+          c_igraph_subgraph gp gp' vsp
+  g <- get
+  return $ foreignGraph g subg
+  --return $ G $ ForeignGraph subg (graphIdToNode g)
+ where
+  emptyWithCtxt :: Graph d a -> Graph d a
+  emptyWithCtxt (G _) = emptyGraph
+-}
+
+{-
+
+4.5. igraph_clusters — Calculates the (weakly or strongly) connected components in a graph.
+
+  int igraph_clusters(const igraph_t *graph, igraph_vector_t *membership, 
+                      igraph_vector_t *csize, igraph_integer_t *no,
+                      igraph_connectedness_t mode);
+
+4.6. igraph_is_connected — Decides whether the graph is (weakly or strongly) connected.
+
+  DONE: -}
 
 foreign import ccall "igraph_is_connected"
   c_igraph_is_connected :: Ptr Void -> Ptr CInt -> CInt -> IO CInt
@@ -379,6 +422,12 @@ isConnected g c = unsafePerformIO $ withGraph g $ \gp -> alloca $ \b -> do
   _ <- c_igraph_is_connected gp b (fromIntegral $ fromEnum c)
   r <- peek b
   return $ r == 1
+
+{-
+
+4.7. igraph_decompose — Decompose a graph into connected components.
+
+  DONE: -}
 
 {- Somehow doesn't work:
 
@@ -392,5 +441,29 @@ decompose g m ma mi = unsafePerformIO $ do
   _e <- withGraph_ g $ \gp -> withVectorPtr vp $ \vpp ->
     c_igraph_decompose gp vpp (fromIntegral $ fromEnum m) (fromIntegral ma) (fromIntegral mi)
   vectorPtrToVertices g vp
+
+-}
+
+{-
+
+4.8. igraph_decompose_destroy — Free the memory allocated by igraph_decompose().
+
+  void igraph_decompose_destroy(igraph_vector_ptr_t *complist);
+
+necessary? I dunno :)
+
+4.9. igraph_biconnected_components — Calculate biconnected components
+
+  int igraph_biconnected_components(const igraph_t *graph,
+                                    igraph_integer_t *no,
+                                    igraph_vector_ptr_t *tree_edges,
+                                    igraph_vector_ptr_t *component_edges,
+                                    igraph_vector_ptr_t *components,
+                                    igraph_vector_t *articulation_points);
+
+4.10. igraph_articulation_points — Find the articulation points in a graph.
+
+  int igraph_articulation_points(const igraph_t *graph,
+                                 igraph_vector_t *res);
 
 -}
