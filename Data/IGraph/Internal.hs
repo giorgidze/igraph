@@ -42,7 +42,7 @@ buildForeignGraph :: Graph d a -> Graph d a
 buildForeignGraph g@(G gr) = G (gr {graphForeignPtr = unsafePerformIO io})
   where
   io :: IO (ForeignPtr Void)
-  io = do print "foo"; v <- edgesToVector g
+  io = do v <- edgesToVector g
           withVector v $ \vp -> do
             gp  <- c_igraph_create vp (if isDirected g then 1 else 0)
             newForeignPtr c_igraph_destroy gp
