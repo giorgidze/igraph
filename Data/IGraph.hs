@@ -467,3 +467,101 @@ necessary? I dunno :)
                                  igraph_vector_t *res);
 
 -}
+
+--------------------------------------------------------------------------------
+-- 13.5 Centrality Measures
+
+{- TODO:
+
+5.1. igraph_closeness — Closeness centrality calculations for some vertices.
+
+  int igraph_closeness(const igraph_t *graph, igraph_vector_t *res,
+                       const igraph_vs_t vids, igraph_neimode_t mode, 
+                       const igraph_vector_t *weights);
+
+5.2. igraph_betweenness — Betweenness centrality of some vertices.
+
+  int igraph_betweenness(const igraph_t *graph, igraph_vector_t *res,
+                         const igraph_vs_t vids, igraph_bool_t directed, 
+                         const igraph_vector_t* weights, igraph_bool_t nobigint);
+
+5.3. igraph_edge_betweenness — Betweenness centrality of the edges.
+
+  int igraph_edge_betweenness(const igraph_t *graph, igraph_vector_t *result,
+                              igraph_bool_t directed, 
+                              const igraph_vector_t *weights);
+
+5.4. igraph_pagerank — Calculates the Google PageRank for the specified vertices.
+
+  int igraph_pagerank(const igraph_t *graph, igraph_vector_t *vector,
+                      igraph_real_t *value, const igraph_vs_t vids,
+                      igraph_bool_t directed, igraph_real_t damping, 
+                      const igraph_vector_t *weights,
+                      igraph_arpack_options_t *options);
+
+5.5. igraph_pagerank_old — Calculates the Google PageRank for the specified vertices.
+
+  int igraph_pagerank_old(const igraph_t *graph, igraph_vector_t *res, 
+                          const igraph_vs_t vids, igraph_bool_t directed,
+                          igraph_integer_t niter, igraph_real_t eps, 
+                          igraph_real_t damping, igraph_bool_t old);
+
+5.6. igraph_personalized_pagerank — Calculates the personalized Google PageRank for the specified vertices.
+
+  int igraph_personalized_pagerank(const igraph_t *graph, igraph_vector_t *vector,
+                                   igraph_real_t *value, const igraph_vs_t vids,
+                                   igraph_bool_t directed, igraph_real_t damping, 
+                                   igraph_vector_t *reset,
+                                   const igraph_vector_t *weights,
+                                   igraph_arpack_options_t *options);
+
+5.7. igraph_personalized_pagerank_vs — Calculates the personalized Google PageRank for the specified vertices.
+
+  int igraph_personalized_pagerank_vs(const igraph_t *graph, igraph_vector_t *vector,
+                                      igraph_real_t *value, const igraph_vs_t vids,
+                                      igraph_bool_t directed, igraph_real_t damping, 
+                                      igraph_vs_t reset_vids,
+                                      const igraph_vector_t *weights,
+                                      igraph_arpack_options_t *options);
+
+5.8. igraph_constraint — Burt's constraint scores.
+
+  int igraph_constraint(const igraph_t *graph, igraph_vector_t *res,
+                        igraph_vs_t vids, const igraph_vector_t *weights);
+
+5.9. igraph_maxdegree — Calculate the maximum degree in a graph (or set of vertices).
+
+  int igraph_maxdegree(const igraph_t *graph, igraph_integer_t *res,
+                       igraph_vs_t vids, igraph_neimode_t mode, 
+                       igraph_bool_t loops);
+
+5.10. igraph_strength — Strength of the vertices, weighted vertex degree in other words.
+
+  int igraph_strength(const igraph_t *graph, igraph_vector_t *res,
+                      const igraph_vs_t vids, igraph_neimode_t mode,
+                      igraph_bool_t loops, const igraph_vector_t *weights);
+
+5.11. igraph_eigenvector_centrality — Eigenvector centrality of the vertices
+
+  int igraph_eigenvector_centrality(const igraph_t *graph, 
+                                    igraph_vector_t *vector,
+                                    igraph_real_t *value, 
+                                    igraph_bool_t directed, igraph_bool_t scale,
+                                    const igraph_vector_t *weights,
+                                    igraph_arpack_options_t *options);
+
+5.12. igraph_hub_score — Kleinberg's hub scores
+
+  int igraph_hub_score(const igraph_t *graph, igraph_vector_t *vector,
+                       igraph_real_t *value, igraph_bool_t scale,
+                       const igraph_vector_t *weights,
+                       igraph_arpack_options_t *options);
+
+5.13. igraph_authority_score — Kleinerg's authority scores
+
+  int igraph_authority_score(const igraph_t *graph, igraph_vector_t *vector,
+                             igraph_real_t *value, igraph_bool_t scale,
+                             const igraph_vector_t *weights,
+                             igraph_arpack_options_t *options);
+
+-}
