@@ -599,3 +599,86 @@ necessary? I dunno :)
                                        const igraph_vector_t *weights);
 
 -}
+
+--------------------------------------------------------------------------------
+-- 13.7 Centralization
+
+{- TODO:
+
+7.1. igraph_centralization — Calculate the centralization score from the node level scores
+
+  igraph_real_t igraph_centralization(const igraph_vector_t *scores,
+                                      igraph_real_t theoretical_max,
+                                      igraph_bool_t normalized);
+
+7.2. igraph_centralization_degree — Calculate vertex degree and graph centralization
+
+  int igraph_centralization_degree(const igraph_t *graph,
+                                   igraph_vector_t *res, 
+                                   igraph_neimode_t mode, igraph_bool_t loops,
+                                   igraph_real_t *centralization,
+                                   igraph_real_t *theoretical_max,
+                                   igraph_bool_t normalized);
+
+7.3. igraph_centralization_betweenness — Calculate vertex betweenness and graph centralization
+
+  int igraph_centralization_betweenness(const igraph_t *graph, 
+                                        igraph_vector_t *res,
+                                        igraph_bool_t directed,
+                                        igraph_bool_t nobigint,
+                                        igraph_real_t *centralization,
+                                        igraph_real_t *theoretical_max,
+                                        igraph_bool_t normalized);
+
+7.4. igraph_centralization_closeness — Calculate vertex closeness and graph centralization
+
+  int igraph_centralization_closeness(const igraph_t *graph, 
+                                      igraph_vector_t *res, 
+                                      igraph_neimode_t mode, 
+                                      igraph_real_t *centralization,
+                                      igraph_real_t *theoretical_max,
+                                      igraph_bool_t normalized);
+
+7.5. igraph_centralization_eigenvector_centrality — Calculate eigenvector centrality scores and graph centralization
+
+  int igraph_centralization_eigenvector_centrality(const igraph_t *graph,
+                                                   igraph_vector_t *vector,
+                                                   igraph_real_t *value,
+                                                   igraph_bool_t directed,
+                                                   igraph_bool_t scale,
+                                                   igraph_arpack_options_t *options,
+                                                   igraph_real_t *centralization,
+                                                   igraph_real_t *theoretical_max,
+                                                   igraph_bool_t normalized);
+
+7.6. igraph_centralization_degree_tmax — Theoretical maximum for graph centralization based on degree
+
+  int igraph_centralization_degree_tmax(const igraph_t *graph, 
+                                        igraph_integer_t nodes,
+                                        igraph_neimode_t mode,
+                                        igraph_bool_t loops,
+                                        igraph_real_t *res);
+
+7.7. igraph_centralization_betweenness_tmax — Theoretical maximum for graph centralization based on betweenness
+
+  int igraph_centralization_betweenness_tmax(const igraph_t *graph, 
+                                             igraph_integer_t nodes,
+                                             igraph_bool_t directed,
+                                             igraph_real_t *res);
+
+7.8. igraph_centralization_closeness_tmax — Theoretical maximum for graph centralization based on closeness
+
+  int igraph_centralization_closeness_tmax(const igraph_t *graph,
+                                           igraph_integer_t nodes,
+                                           igraph_neimode_t mode,
+                                           igraph_real_t *res);
+
+7.9. igraph_centralization_eigenvector_centrality_tmax — Theoretical maximum centralization for eigenvector centrality
+
+  int igraph_centralization_eigenvector_centrality_tmax(const igraph_t *graph,
+                                                        igraph_integer_t nodes,
+                                                        igraph_bool_t directed,
+                                                        igraph_bool_t scale, 
+                                                        igraph_real_t *res);
+
+-}
