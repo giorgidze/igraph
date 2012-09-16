@@ -40,6 +40,10 @@ module Data.IGraph
   , getAllShortestPaths
   , averagePathLength
   , pathLengthHist
+  , diameter, diameter', diameter''
+  , girth, girth'
+  , eccentricity
+  , radius
 
     -- ** 13\.4 Graph Components
   , subcomponent
@@ -368,10 +372,79 @@ pathLengthHist g b = unsafePerformIO $ do
 
 2.13. igraph_diameter — Calculates the diameter of a graph (longest geodesic).
 
-  int igraph_diameter(const igraph_t *graph, igraph_integer_t *pres, 
-                      igraph_integer_t *pfrom, igraph_integer_t *pto, 
-                      igraph_vector_t *path,
-                      igraph_bool_t directed, igraph_bool_t unconn);
+  DONE: -}
+
+foreign import ccall "igraph_diameter"
+  c_igraph_diameter :: GraphPtr
+                    -> Ptr CInt
+                    -> Ptr CInt
+                    -> Ptr CInt
+                    -> VectorPtr
+                    -> Bool
+                    -> Bool
+                    -> IO CInt
+
+diameter :: Graph d a
+         -> Bool -- ^ directed?
+         -> Bool -- ^ unconnected?
+         -> Int
+diameter g b1 b2 = unsafePerformIO $ do
+  alloca $ \ip -> do
+    _e <- withGraph g $ \gp ->
+      c_igraph_diameter
+        gp
+        ip
+        nullPtr
+        nullPtr
+        nullPtr
+        b1
+        b2
+    fromIntegral `fmap` peek ip
+
+diameter' :: Graph d a
+          -> Bool
+          -> Bool
+          -> (Int, (a,a)) -- ^ the diameter of the graph and the starting/end vertices
+diameter' g b1 b2 = unsafePerformIO $ do
+  alloca $ \ip -> do
+    alloca $ \fip -> do
+      alloca $ \tip -> do
+        _e <- withGraph g $ \gp ->
+                c_igraph_diameter
+                  gp
+                  ip
+                  fip
+                  tip
+                  nullPtr
+                  b1
+                  b2
+        d  <- fromIntegral `fmap` peek ip
+        fi <- fromIntegral `fmap` peek fip
+        ti <- fromIntegral `fmap` peek tip
+        return (d, (idToNode'' g fi, idToNode'' g ti))
+
+diameter'' :: Graph d a
+           -> Bool
+           -> Bool
+           -> (Int, [a]) -- ^ the diameter of the graph and the actual longest path
+diameter'' g b1 b2 = unsafePerformIO $ do
+  alloca $ \ip -> do
+    v  <- newVector 0
+    _e <- withGraph g $ \gp ->
+            withVector v $ \vp ->
+              c_igraph_diameter
+                gp
+                ip
+                nullPtr
+                nullPtr
+                vp
+                b1
+                b2
+    d <- fromIntegral `fmap` peek ip
+    p <- vectorToVertices g v
+    return (d,p)
+
+{-
 
 2.14. igraph_diameter_dijkstra — Weighted diameter using Dijkstra's algorithm, non-negative weights only.
 
@@ -386,22 +459,79 @@ pathLengthHist g b = unsafePerformIO $ do
 
 2.15. igraph_girth — The girth of a graph is the length of the shortest circle in it.
 
-int igraph_girth(const igraph_t *graph, igraph_integer_t *girth, 
-                 igraph_vector_t *circle);
+  DONE: -}
+
+foreign import ccall "igraph_girth"
+  c_igraph_girth :: GraphPtr -> Ptr CInt -> VectorPtr -> IO CInt
+
+girth :: Graph d a -> Int
+girth g = unsafePerformIO $ do
+  alloca $ \ip -> do
+    _e <- withGraph g $ \gp ->
+            c_igraph_girth
+              gp
+              ip
+              nullPtr
+    fromIntegral `fmap` peek ip
+
+girth' :: Graph d a
+       -> (Int, [a])  -- ^ girth with the actual shortest circle
+girth' g = unsafePerformIO $ do
+  alloca $ \ip -> do
+    v <- newVector 0
+    _e <- withGraph g $ \gp ->
+            withVector v $ \vp ->
+              c_igraph_girth
+                gp
+                ip
+                vp
+    gr <- fromIntegral `fmap` peek ip
+    s  <- vectorToVertices g v
+    return (gr, s)
+
+{-
 
 2.16. igraph_eccentricity — Eccentricity of some vertices
 
-  int igraph_eccentricity(const igraph_t *graph, 
-                          igraph_vector_t *res,
-                          igraph_vs_t vids,
-                          igraph_neimode_t mode);
+  DONE: -}
+
+foreign import ccall "eccentricity"
+  c_igraph_eccentricity :: GraphPtr -> VectorPtr -> VsPtr -> CInt -> IO CInt
+
+eccentricity :: Graph d a -> VertexSelector a -> NeiMode -> [(a,Int)]
+eccentricity g vs m = unsafePerformIO $ do
+  v  <- newVector 0
+  _e <- withGraph g $ \gp ->
+          withVs vs g $ \vsp ->
+            withVector v $ \vp ->
+              c_igraph_eccentricity
+                gp
+                vp
+                vsp
+                (fromIntegral $ fromEnum m)
+  l <- map round `fmap` vectorToList v
+  return $ zip (selectedVertices g vs) l
+
+
+{-
 
 2.17. igraph_radius — Radius of a graph
 
-  int igraph_radius(const igraph_t *graph, igraph_real_t *radius, 
-                    igraph_neimode_t mode);
+  DONE: -}
 
--}
+foreign import ccall "igraph_radius"
+  c_igraph_radius :: GraphPtr -> Ptr CDouble -> CInt -> IO CInt
+
+radius :: Graph d a -> NeiMode -> Int
+radius g m = unsafePerformIO $ do
+  alloca $ \dp -> do
+    _e <- withGraph g $ \gp ->
+            c_igraph_radius
+              gp
+              dp
+              (fromIntegral $ fromEnum m)
+    round `fmap` peek dp
+
 
 --------------------------------------------------------------------------------
 -- 13.3 Neighborhood of a vertex

@@ -160,6 +160,14 @@ int get_all_shortest_paths(const igraph_t *graph,
     return igraph_get_all_shortest_paths(graph, res, nrgeo, from, *to, mode);
 }
 
+int eccentricity(const igraph_t *graph, 
+                igraph_vector_t *res,
+                igraph_vs_t *vids,
+                igraph_neimode_t mode)
+{
+    return igraph_eccentricity(graph, res, *vids, mode);
+}
+
 /*******************************************************************************
  *
  * 13.3 Neighborhood of a vertex
