@@ -18,6 +18,9 @@ g,h :: Graph D Int
 g = fromList [(0,1), (1,2), (2,3), (3,4), (4,5), (0,3), (3,5)]
 h = fromList [(0,1), (1,2), (2,3), (0,3), (4,5), (5,6), (4,6)]
 
+w :: Graph (Weighted D) Int
+w = fromListWeighted [ (0,1, 1), (1,2, 3), (1,3, 1), (3,2, 1) ]
+
 main :: IO ()
 main = do
   putStrLn $ "Nodes:                       " ++ show (nodes g)
