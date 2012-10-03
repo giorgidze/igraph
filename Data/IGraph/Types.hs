@@ -98,6 +98,36 @@ instance Hashable a => Hashable (Edge D a) where
 instance Show a => Show (Edge D a) where
   show (D_Edge a b) = "Edge D {" ++ show a ++ " -> " ++ show b ++ "}"
 
+
+class IsUnweighted d where
+  liftIsDirected :: Graph (Weighted d) a -> Bool
+
+instance IsUnweighted U where
+  liftIsDirected _ = False
+
+instance IsUnweighted D where
+  liftIsDirected _ = True
+
+
+-- | Weighted graphs, weight defaults to 0
+data Weighted d
+
+instance (E d a, IsUnweighted d) => E (Weighted d) a where
+  isDirected = liftIsDirected
+  data Edge (Weighted d) a = W (Edge d a) Int
+  toEdge a b = W (toEdge a b) 0
+  edgeFrom (W e _) = edgeFrom e
+  edgeTo   (W e _) = edgeTo   e
+
+instance E d a => Eq (Edge (Weighted d) a) where
+  (W e w) == (W e' w') = w == w' && e == e'
+
+instance E d a => Hashable (Edge (Weighted d) a) where
+  hash (W e w) = hash (edgeFrom e, edgeTo e, w)
+
+instance Show (Edge d a) => Show (Edge (Weighted d) a) where
+  show (W e w) = show e ++ "(" ++ show w ++ ")"
+
 --------------------------------------------------------------------------------
 -- Vertex selectors
 

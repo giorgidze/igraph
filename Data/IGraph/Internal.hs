@@ -59,16 +59,22 @@ setGraphPointer (G g) gp = do
 foreign import ccall "edges"
   c_igraph_edges :: GraphPtr -> IO VectorPtrPtr
 
-instance (Show a) => Show (Graph U a) where
+instance Show a => Show (Graph U a) where
   show (G g) = show (graphEdges g)
 
-instance (Show a) => Show (Graph D a) where
+instance Show a => Show (Graph D a) where
   show (G g) = show (graphEdges g)
 
 instance Eq (Graph U a) where
   (G g1) == (G g2) = graphEdges g1 == graphEdges g2
 
 instance Eq (Graph D a) where
+  (G g1) == (G g2) = graphEdges g1 == graphEdges g2
+
+instance Show (Edge d a) => Show (Graph (Weighted d) a) where
+  show (G g) = show (graphEdges g)
+
+instance Eq (Edge d a) => Eq (Graph (Weighted d) a) where
   (G g1) == (G g2) = graphEdges g1 == graphEdges g2
 
 --------------------------------------------------------------------------------
@@ -321,11 +327,20 @@ forListM_ (a : as) f = f a >> forListM_ as f
 --------------------------------------------------------------------------------
 -- Basics
 
+getWeight :: Edge (Weighted d) a -> Int
+getWeight (W _ w) = w
+
+toEdgeWeighted :: E d a => a -> a -> Int -> Edge (Weighted d) a
+toEdgeWeighted a b w = W (toEdge a b) w
+
 emptyGraph :: E d a => Graph d a
 emptyGraph = buildForeignGraph $ G (Graph 0 0 Map.empty Map.empty Set.empty undefined)
 
 fromList :: E d a => [(a,a)] -> Graph d a
 fromList = foldl' (\g (a,b) -> insertEdge (toEdge a b) g) emptyGraph
+
+fromListWeighted :: (E d a, IsUnweighted d) => [(a,a,Int)] -> Graph (Weighted d) a
+fromListWeighted = foldl' (\g (a,b,w) -> insertEdge (W (toEdge a b) w) g) emptyGraph
 
 numberOfNodes :: Graph d a -> Int
 numberOfNodes (G g) = graphNodeNumber g

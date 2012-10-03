@@ -4,11 +4,13 @@
 -- section for more documentation about a specific function.
 module Data.IGraph
   ( -- * Base types
-    Graph (..), E (..), D, U
+    Graph (..), E (..)
+  , D, U, IsUnweighted
+  , Weighted, toEdgeWeighted, getWeight
 
     -- * Construction
   , emptyGraph
-  , fromList
+  , fromList, fromListWeighted
   , insertEdge
   , deleteEdge
   , deleteNode
