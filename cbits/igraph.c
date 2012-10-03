@@ -142,6 +142,26 @@ int shortest_paths(const igraph_t *graph, igraph_matrix_t *res,
     return igraph_shortest_paths(graph, res, *from, *to, mode);
 }
 
+int shortest_paths_dijkstra(const igraph_t *graph, igraph_matrix_t *res, 
+        const igraph_vs_t *from, const igraph_vs_t *to, const igraph_vector_t *weights,
+        igraph_neimode_t mode)
+{
+    return igraph_shortest_paths_dijkstra(graph, res, *from, *to, weights, mode);
+}
+
+int shortest_paths_bellman_ford(const igraph_t *graph, igraph_matrix_t *res, 
+        const igraph_vs_t *from, const igraph_vs_t *to, const igraph_vector_t *weights,
+        igraph_neimode_t mode)
+{
+    return igraph_shortest_paths_bellman_ford(graph, res, *from, *to, weights, mode);
+}
+
+int shortest_paths_johnson(const igraph_t *graph, igraph_matrix_t *res, 
+        const igraph_vs_t *from, const igraph_vs_t *to, const igraph_vector_t *weights)
+{
+    return igraph_shortest_paths_johnson(graph, res, *from, *to, weights);
+}
+
 int get_shortest_paths(const igraph_t *graph, 
                 igraph_vector_ptr_t *vertices,
                 igraph_vector_ptr_t *edges,
@@ -151,6 +171,15 @@ int get_shortest_paths(const igraph_t *graph,
     return igraph_get_shortest_paths(graph, vertices, edges, from, *to, mode);
 }
 
+int get_shortest_paths_dijkstra(const igraph_t *graph, 
+                igraph_vector_ptr_t *vertices,
+                igraph_vector_ptr_t *edges,
+                igraph_integer_t from, const igraph_vs_t *to, 
+                igraph_vector_t *weights, igraph_neimode_t mode)
+{
+    return igraph_get_shortest_paths_dijkstra(graph, vertices, edges, from, *to, weights, mode);
+}
+
 int get_all_shortest_paths(const igraph_t *graph,
                 igraph_vector_ptr_t *res, 
                 igraph_vector_t *nrgeo,
@@ -158,6 +187,15 @@ int get_all_shortest_paths(const igraph_t *graph,
                 igraph_neimode_t mode)
 {
     return igraph_get_all_shortest_paths(graph, res, nrgeo, from, *to, mode);
+}
+
+int get_all_shortest_paths_dijkstra(const igraph_t *graph,
+                igraph_vector_ptr_t *res, 
+                igraph_vector_t *nrgeo,
+                igraph_integer_t from, const igraph_vs_t *to,
+                igraph_vector_t *weights, igraph_neimode_t mode)
+{
+    return igraph_get_all_shortest_paths_dijkstra(graph, res, nrgeo, from, *to, weights, mode);
 }
 
 int eccentricity(const igraph_t *graph, 

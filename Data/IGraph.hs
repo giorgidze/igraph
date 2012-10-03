@@ -36,10 +36,10 @@ module Data.IGraph
   , areConnected
 
     -- ** 13\.2 Shortest Path Related Functions
-  , shortestPaths
-  , getShortestPaths
-  , getShortestPath
-  , getAllShortestPaths
+  , shortestPaths,       shortestPathsDijkstra, shortestPathsBellmanFord, shortestPathsJohnson
+  , getShortestPaths,    getShortestPathsDijkstra
+  , getShortestPath,     getShortestPathDijkstra
+  , getAllShortestPaths, getAllShortestPathsDijkstra
   , averagePathLength
   , pathLengthHist
   , diameter, diameter', diameter''
@@ -152,37 +152,124 @@ shortestPaths g vf vt m =
                    | (f,lf)  <- zip nf ls
                    , (t,len) <- zip nt (map roundMaybe lf)
                    ]
- where
-  roundMaybe d = if d == 1/0 then Nothing else Just (round d)
+
+roundMaybe :: Double -> Maybe Int
+roundMaybe d = if d == 1/0 then Nothing else Just (round d)
 
 {-- TODO:
 
 2.2. igraph_shortest_paths_dijkstra — Weighted shortest paths from some sources.
 
-  int igraph_shortest_paths_dijkstra(const igraph_t *graph,
-                                     igraph_matrix_t *res,
-                                     const igraph_vs_t from,
-                                     const igraph_vs_t to,
-                                     const igraph_vector_t *weights, 
-                                     igraph_neimode_t mode);
+  DONE: -}
 
+foreign import ccall "shortest_paths_dijkstra"
+  c_igraph_shortest_paths_dijkstra :: GraphPtr -> MatrixPtr -> VsPtr -> VsPtr
+                                   -> VectorPtr -> CInt -> IO CInt
+
+shortestPathsDijkstra :: (Ord a, Hashable a)
+                      => Graph (Weighted d) a
+                      -> VertexSelector a
+                      -> VertexSelector a
+                      -> NeiMode
+                      -> HashMap (a,a) (Maybe Int)  -- ^ (lazy) HashMap
+shortestPathsDijkstra g vf vt m =
+  let ls = unsafePerformIO $ do
+             ma <- newMatrix 0 0
+             _e <- withGraph g $ \gp ->
+                   withWeights g $ \wp ->
+                   withMatrix ma $ \mp ->
+                   withVs vf g $ \vfp ->
+                   withVs vt g $ \vtp ->
+                     c_igraph_shortest_paths_dijkstra
+                       gp
+                       mp
+                       vfp
+                       vtp
+                       wp
+                       (fromIntegral $ fromEnum m)
+             matrixToList ma
+      nf = selectedVertices g vf
+      nt = selectedVertices g vt
+  in  HML.fromList [ ((f,t), len)
+                   | (f,lf)  <- zip nf ls
+                   , (t,len) <- zip nt (map roundMaybe lf)
+                   ]
+
+{-
 2.3. igraph_shortest_paths_bellman_ford — Weighted shortest paths from some sources allowing negative weights.
 
-  int igraph_shortest_paths_bellman_ford(const igraph_t *graph,
-                                         igraph_matrix_t *res,
-                                         const igraph_vs_t from,
-                                         const igraph_vs_t to,
-                                         const igraph_vector_t *weights, 
-                                         igraph_neimode_t mode);
+ DONE: -}
 
+foreign import ccall "shortest_paths_bellman_ford"
+  c_igraph_shortest_paths_bellman_ford :: GraphPtr -> MatrixPtr -> VsPtr -> VsPtr -> VectorPtr
+                                       -> CInt -> IO CInt
+
+shortestPathsBellmanFord :: (Ord a, Hashable a)
+                         => Graph (Weighted d) a
+                         -> VertexSelector a
+                         -> VertexSelector a
+                         -> NeiMode
+                         -> HashMap (a,a) (Maybe Int) -- ^ (lazy) HashMap
+shortestPathsBellmanFord g vf vt m =
+  let ls = unsafePerformIO $ do
+             ma <- newMatrix 0 0
+             _e <- withGraph g $ \gp ->
+                   withWeights g $ \wp ->
+                   withMatrix ma $ \mp ->
+                   withVs vf g $ \vfp ->
+                   withVs vt g $ \vtp ->
+                     c_igraph_shortest_paths_bellman_ford
+                       gp
+                       mp
+                       vfp
+                       vtp
+                       wp
+                       (fromIntegral $ fromEnum m)
+             matrixToList ma
+      nf = selectedVertices g vf
+      nt = selectedVertices g vt
+  in  HML.fromList [ ((f,t), len)
+                   | (f,lf)  <- zip nf ls
+                   , (t,len) <- zip nt (map roundMaybe lf)
+                   ]
+
+{-
 2.4. igraph_shortest_paths_johnson — Calculate shortest paths from some sources using Johnson's algorithm.
 
-  int igraph_shortest_paths_johnson(const igraph_t *graph,
-                                    igraph_matrix_t *res,
-                                    const igraph_vs_t from,
-                                    const igraph_vs_t to,
-                                    const igraph_vector_t *weights);
+  DONE: -}
 
+foreign import ccall "shortest_paths_johnson"
+  c_igraph_shortest_paths_johnson :: GraphPtr -> MatrixPtr -> VsPtr -> VsPtr -> VectorPtr
+                                  -> IO CInt
+
+shortestPathsJohnson :: (Ord a, Hashable a)
+                     => Graph (Weighted d) a
+                     -> VertexSelector a
+                     -> VertexSelector a
+                     -> HashMap (a,a) (Maybe Int) -- ^ (lazy) HashMap
+shortestPathsJohnson g vf vt =
+  let ls = unsafePerformIO $ do
+             ma <- newMatrix 0 0
+             _e <- withGraph g $ \gp ->
+                   withWeights g $ \wp ->
+                   withMatrix ma $ \mp ->
+                   withVs vf g $ \vfp ->
+                   withVs vt g $ \vtp ->
+                     c_igraph_shortest_paths_johnson
+                       gp
+                       mp
+                       vfp
+                       vtp
+                       wp
+             matrixToList ma
+      nf = selectedVertices g vf
+      nt = selectedVertices g vt
+  in  HML.fromList [ ((f,t), len)
+                   | (f,lf)  <- zip nf ls
+                   , (t,len) <- zip nt (map roundMaybe lf)
+                   ]
+
+{-
 2.5. igraph_get_shortest_paths — Calculates the shortest paths from/to one vertex.
 
   DONE: -}
@@ -190,6 +277,7 @@ shortestPaths g vf vt m =
 foreign import ccall "get_shortest_paths"
   c_igraph_get_shortest_paths :: GraphPtr -> VectorPtrPtr -> VectorPtrPtr -> CInt -> VsPtr -> CInt -> IO CInt
 
+-- | This doesn't work? TODO
 getShortestPaths :: Graph d a
                  -> a                     -- ^ from
                  -> VertexSelector a      -- ^ to
@@ -249,24 +337,80 @@ getShortestPath g n1 n2 m =
 
 2.7. igraph_get_shortest_paths_dijkstra — Calculates the weighted shortest paths from/to one vertex.
 
-  int igraph_get_shortest_paths_dijkstra(const igraph_t *graph,
-                                         igraph_vector_ptr_t *vertices,
-                                         igraph_vector_ptr_t *edges,
-                                         igraph_integer_t from,
-                                         igraph_vs_t to,
-                                         const igraph_vector_t *weights,
-                                         igraph_neimode_t mode);
+  DONE: -}
 
+foreign import ccall "get_shortest_paths_dijkstra"
+  c_igraph_get_shortest_paths_dijkstra :: GraphPtr -> VectorPtrPtr -> VectorPtrPtr
+                                       -> CInt -> VsPtr -> VectorPtr -> CInt -> IO CInt
+
+-- | This doesn't work? TODO
+getShortestPathsDijkstra :: Graph (Weighted d) a
+                         -> a                     -- ^ from
+                         -> VertexSelector a      -- ^ to
+                         -> NeiMode
+                         -> [ ([a],[Edge (Weighted d) a]) ]  -- ^ list of @(vertices, edges)@
+getShortestPathsDijkstra g f vt m =
+  let mfi = nodeToId g f
+   in case mfi of
+           Nothing -> error "getShortestPathsDijkstra: Invalid node"
+           Just fi -> unsafePerformIO $ do
+             vpv <- newVectorPtr 0
+             vpe <- newVectorPtr 0
+             _e  <- withGraph g $ \gp ->
+                    withWeights g $ \wp ->
+                    withVectorPtr vpv $ \vpvp ->
+                    withVectorPtr vpe $ \vpep ->
+                    withVs vt g $ \vtp ->
+                     c_igraph_get_shortest_paths_dijkstra
+                       gp
+                       vpvp
+                       vpep
+                       (fromIntegral fi)
+                       vtp
+                       wp
+                       (fromIntegral $ fromEnum m)
+             v <- vectorPtrToVertices g vpv
+             e <- vectorPtrToEdges    g vpe
+             return $ zip v e
+
+{-
 2.8. igraph_get_shortest_path_dijkstra — Weighted shortest path from one vertex to another one.
 
-  int igraph_get_shortest_path_dijkstra(const igraph_t *graph,
-                                        igraph_vector_t *vertices,
-                                        igraph_vector_t *edges,
-                                        igraph_integer_t from,
-                                        igraph_integer_t to,
-                                        const igraph_vector_t *weights,
-                                        igraph_neimode_t mode);
+  DONE: -}
 
+foreign import ccall "igraph_get_shortest_path_dijkstra"
+  c_igraph_get_shortest_path_dijkstra :: GraphPtr -> VectorPtr -> VectorPtr -> CInt
+                                      -> CInt -> VectorPtr -> CInt -> IO CInt
+
+getShortestPathDijkstra :: Graph (Weighted d) a -> a -> a -> NeiMode -> ([a],[Edge (Weighted d) a])
+getShortestPathDijkstra g n1 n2 m =
+  let mi1 = nodeToId g n1
+      mi2 = nodeToId g n2
+  in  case (mi1, mi2) of
+           (Just i1, Just i2) -> unsafePerformIO $ do
+             v1 <- newVector 0
+             v2 <- newVector 0
+             e  <- withGraph g $ \gp ->
+                   withWeights g $ \wp ->
+                   withVector v1 $ \vp1 ->
+                   withVector v2 $ \vp2 ->
+                     c_igraph_get_shortest_path_dijkstra
+                       gp
+                       vp1
+                       vp2
+                       (fromIntegral i1)
+                       (fromIntegral i2)
+                       wp
+                       (fromIntegral $ fromEnum m)
+             if e == 0 then do
+                vert <- vectorToVertices g v1
+                edgs <- vectorToEdges    g v2
+                return ( vert, edgs )
+              else
+                error $ "getShortestPathDijkstra: igraph error " ++ show e
+           _ -> error "getShortestPathDijkstra: Invalid nodes"
+
+{-
 2.9. igraph_get_all_shortest_paths — Finds all shortest paths (geodesics) from a vertex to all other vertices.
 
   DONE: -}
@@ -308,13 +452,45 @@ getAllShortestPaths g f vt m =
 
 2.10. igraph_get_all_shortest_paths_dijkstra — Finds all shortest paths (geodesics) from a vertex to all other vertices.
 
-  int igraph_get_all_shortest_paths_dijkstra(const igraph_t *graph,
-                                             igraph_vector_ptr_t *res, 
-                                             igraph_vector_t *nrgeo,
-                                             igraph_integer_t from, igraph_vs_t to,
-                                             const igraph_vector_t *weights,
-                                             igraph_neimode_t mode);
+  DONE: -}
 
+foreign import ccall "get_all_shortest_paths_dijkstra"
+  c_igraph_get_all_shortest_paths_dijkstra :: GraphPtr
+                                           -> VectorPtrPtr
+                                           -> VectorPtr
+                                           -> CInt
+                                           -> VsPtr
+                                           -> VectorPtr
+                                           -> CInt
+                                           -> IO CInt
+
+getAllShortestPathsDijkstra :: Graph (Weighted d) a
+                            -> a                  -- ^ from
+                            -> VertexSelector a   -- ^ to
+                            -> NeiMode
+                            -> [[a]]  -- ^ list of vertices along the shortest path from
+                                      -- @from@ to each other (reachable) vertex
+getAllShortestPathsDijkstra g f vt m =
+  let mfi = nodeToId g f
+   in case mfi of
+           Nothing -> error "getAllShortestPaths: Invalid node"
+           Just fi -> unsafePerformIO $ do
+             vpr <- newVectorPtr 0
+             _e  <- withGraph g $ \gp ->
+                    withWeights g $ \wp ->
+                    withVectorPtr vpr $ \vprp ->
+                    withVs vt g $ \vtp ->
+                      c_igraph_get_all_shortest_paths_dijkstra
+                        gp
+                        vprp 
+                        nullPtr -- NULL
+                        (fromIntegral fi)
+                        vtp
+                        wp
+                        (fromIntegral $ fromEnum m)
+             vectorPtrToVertices g vpr
+
+{-
 2.11. igraph_average_path_length — Calculates the average geodesic length in a graph.
 
   DONE: -}
@@ -719,6 +895,14 @@ necessary? I dunno :)
   int igraph_closeness(const igraph_t *graph, igraph_vector_t *res,
                        const igraph_vs_t vids, igraph_neimode_t mode, 
                        const igraph_vector_t *weights);
+
+  -}
+
+-- HOW to handle weights?
+--foreign import ccall "closeness"
+  --c_igraph_closeness :: GraphPtr -> VectorPtr -> VsPtr -> CInt -> VectorPtr -> IO CInt
+
+{-
 
 5.2. igraph_betweenness — Betweenness centrality of some vertices.
 

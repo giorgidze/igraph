@@ -55,6 +55,10 @@ setGraphPointer (G g) gp = do
   fp <- newForeignPtr c_igraph_destroy gp
   return $ G g{ graphForeignPtr = fp }
 
+withWeights :: Graph (Weighted d) a -> (VectorPtr -> IO res) -> IO res
+withWeights g io = do
+  v <- listToVector $ map getWeight (Set.toList (edges g))
+  withVector v io
 
 foreign import ccall "edges"
   c_igraph_edges :: GraphPtr -> IO VectorPtrPtr
