@@ -21,6 +21,7 @@ module Data.IGraph
   , nodes
   , edges
   , neighbours
+  , reverseGraphDirection
 
     -- * Chapter 11. Vertex and Edge Selectors and Sequences, Iterators
 
@@ -142,7 +143,7 @@ shortestPaths g vf vt =
                        mp
                        vfp
                        vtp
-                       (fromIntegral $ fromEnum Out)
+                       (getNeiMode g)
              matrixToList ma
       nf = selectedVertices g vf
       nt = selectedVertices g vt
@@ -183,7 +184,7 @@ shortestPathsDijkstra g vf vt =
                        vfp
                        vtp
                        wp
-                       (fromIntegral $ fromEnum Out)
+                       (getNeiMode g)
              matrixToList ma
       nf = selectedVertices g vf
       nt = selectedVertices g vt
@@ -220,7 +221,7 @@ shortestPathsBellmanFord g vf vt =
                        vfp
                        vtp
                        wp
-                       (fromIntegral $ fromEnum Out)
+                       (getNeiMode g)
              matrixToList ma
       nf = selectedVertices g vf
       nt = selectedVertices g vt
@@ -295,7 +296,7 @@ getShortestPaths g f vt =
                          vpep
                          (fromIntegral fi)
                          vtp
-                         (fromIntegral $ fromEnum Out)
+                         (getNeiMode g)
              v <- vectorPtrToVertices g vpv
              e <- vectorPtrToEdges    g vpe
              return $ zip v e
@@ -319,7 +320,13 @@ getShortestPath g n1 n2 =
                v1 <- listToVector ([] :: [Int])
                v2 <- listToVector ([] :: [Int])
                e <- withVector v1 $ \vp1 -> withVector v2 $ \vp2 ->
-                     c_igraph_get_shortest_path gp vp1 vp2 (fromIntegral i1) (fromIntegral i2) (fromIntegral (fromEnum Out))
+                     c_igraph_get_shortest_path
+                       gp
+                       vp1
+                       vp2
+                       (fromIntegral i1)
+                       (fromIntegral i2)
+                       (getNeiMode g)
                if e == 0 then do
                    vert <- vectorToVertices g v1
                    edgs <- vectorToEdges    g v2
@@ -362,7 +369,7 @@ getShortestPathsDijkstra g f vt =
                        (fromIntegral fi)
                        vtp
                        wp
-                       (fromIntegral $ fromEnum Out)
+                       (getNeiMode g)
              v <- vectorPtrToVertices g vpv
              e <- vectorPtrToEdges    g vpe
              return $ zip v e
@@ -395,7 +402,7 @@ getShortestPathDijkstra g n1 n2 =
                        (fromIntegral i1)
                        (fromIntegral i2)
                        wp
-                       (fromIntegral $ fromEnum Out)
+                       (getNeiMode g)
              if e == 0 then do
                 vert <- vectorToVertices g v1
                 edgs <- vectorToEdges    g v2
@@ -438,7 +445,7 @@ getAllShortestPaths g f vt =
                           nullPtr -- NULL
                           (fromIntegral fi)
                           vtp
-                          (fromIntegral $ fromEnum Out)
+                          (getNeiMode g)
              vectorPtrToVertices g vpr
 
 {-
@@ -479,7 +486,7 @@ getAllShortestPathsDijkstra g f vt =
                         (fromIntegral fi)
                         vtp
                         wp
-                        (fromIntegral $ fromEnum Out)
+                        (getNeiMode g)
              vectorPtrToVertices g vpr
 
 {-
@@ -678,7 +685,7 @@ eccentricity g vs = unsafePerformIO $ do
                 gp
                 vp
                 vsp
-                (fromIntegral $ fromEnum Out)
+                (getNeiMode g)
   l <- map round `fmap` vectorToList v
   return $ zip (selectedVertices g vs) l
 
@@ -699,7 +706,7 @@ radius g = unsafePerformIO $ do
             c_igraph_radius
               gp
               dp
-              (fromIntegral $ fromEnum Out)
+              (getNeiMode g)
     round `fmap` peek dp
 
 
@@ -729,7 +736,7 @@ neighborhood :: VertexSelector a -> Int -> IGraph (Graph d a) [[a]]
 neighborhood vs o = runUnsafeIO $ \g -> do
   v        <- newVectorPtr 10
   (_e, g') <- withGraph g $ \gp -> withVs vs g $ \vsp -> withVectorPtr v $ \vp ->
-    c_igraph_neighborhood gp vp vsp (fromIntegral o) (fromIntegral (fromEnum Out))
+    c_igraph_neighborhood gp vp vsp (fromIntegral o) (getNeiMode g)
   ids      <- vectorPtrToList v
   return (map (map (idToNode'' g . round)) ids, g')
 
@@ -763,7 +770,11 @@ subcomponent g a = case nodeToId g a of
   Just i -> unsafePerformIO $ do
     v <- newVector 0
     _ <- withGraph g $ \gp -> withVector v $ \vp ->
-      c_igraph_subcomponent gp vp (fromIntegral i) (fromIntegral $ fromEnum Out)
+      c_igraph_subcomponent
+        gp
+        vp
+        (fromIntegral i)
+        (getNeiMode g)
     vectorToVertices g v
   _ -> []
 
@@ -899,7 +910,7 @@ closeness g vs = unsafePerformIO $ do
             gp
             vp
             vsp
-            (fromIntegral $ fromEnum Out)
+            (getNeiMode g)
             wp
   scores <- vectorToList v
   return $ M.fromList $ zip (selectedVertices g vs) scores

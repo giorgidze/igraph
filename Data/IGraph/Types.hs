@@ -7,6 +7,8 @@ import Data.HashSet as S (HashSet, foldr)
 import Foreign.Ptr
 import Foreign.ForeignPtr
 
+import Data.IGraph.Internal.Constants
+
 --------------------------------------------------------------------------------
 -- C stuff
 
@@ -50,6 +52,7 @@ data G d a
           , graphNodeToId          :: !(HashMap a Int)
           , graphEdges             :: !(HashSet (Edge d a))
           , graphForeignPtr        :: ForeignPtr Void
+          , graphNeiMode           :: NeiMode
           }
 
 -- | Class for graph edges, particularly for undirected edges @Edge U a@ and

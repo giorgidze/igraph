@@ -33,6 +33,9 @@ edgeIdToEdge g i
  where
   es = edges g
 
+getNeiMode :: Integral i => Graph d a -> i
+getNeiMode (G g) = fromIntegral $ fromEnum (graphNeiMode g)
+
 --------------------------------------------------------------------------------
 -- Graphs
 
@@ -349,7 +352,7 @@ toEdgeWeighted :: E d a => a -> a -> Int -> Edge (Weighted d) a
 toEdgeWeighted a b w = W (toEdge a b) w
 
 emptyGraph :: E d a => Graph d a
-emptyGraph = buildForeignGraph $ G (Graph 0 0 Map.empty Map.empty Set.empty undefined)
+emptyGraph = buildForeignGraph $ G (Graph 0 0 Map.empty Map.empty Set.empty undefined Out)
 
 fromList :: E d a => [(a,a)] -> Graph d a
 fromList = foldl' (\g (a,b) -> insertEdge (toEdge a b) g) emptyGraph
@@ -446,3 +449,11 @@ neighbours n g@(G _) =
     | edgeFrom e == n                       = Set.insert (edgeTo   e) r
     | edgeTo   e == n && not (isDirected g) = Set.insert (edgeFrom e) r
     | otherwise                             = r
+
+-- | Reverse a graph direction (Out -> In, In -> Out, other -> Out). O(1)
+reverseGraphDirection :: Graph d a -> Graph d a
+reverseGraphDirection (G g) = G g { graphNeiMode = reverse' (graphNeiMode g) }
+ where
+  reverse' Out = In
+  reverse' In  = Out
+  reverse' _ = Out
