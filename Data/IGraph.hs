@@ -64,8 +64,8 @@ import Data.IGraph.Internal.Constants
 import Data.IGraph.Types
 
 import Data.Hashable
-import Data.HashMap.Lazy (HashMap)
-import qualified Data.HashMap.Lazy as HML
+import Data.Map (Map)
+import qualified Data.Map as M
 
 import Foreign hiding (unsafePerformIO)
 import Foreign.C
@@ -130,7 +130,7 @@ shortestPaths :: (Ord a, Hashable a)
               => Graph d a
               -> VertexSelector a
               -> VertexSelector a
-              -> HashMap (a,a) (Maybe Int) -- ^ (lazy) `HashMap'
+              -> Map (a,a) (Maybe Int)
 shortestPaths g vf vt =
   let ls = unsafePerformIO $ do
              ma <- newMatrix 0 0
@@ -147,10 +147,10 @@ shortestPaths g vf vt =
              matrixToList ma
       nf = selectedVertices g vf
       nt = selectedVertices g vt
-  in  HML.fromList [ ((f,t), len)
-                   | (f,lf)  <- zip nf ls
-                   , (t,len) <- zip nt (map roundMaybe lf)
-                   ]
+  in  M.fromList [ ((f,t), len)
+                 | (f,lf)  <- zip nf ls
+                 , (t,len) <- zip nt (map roundMaybe lf)
+                 ]
 
 roundMaybe :: Double -> Maybe Int
 roundMaybe d = if d == 1/0 then Nothing else Just (round d)
@@ -169,7 +169,7 @@ shortestPathsDijkstra :: (Ord a, Hashable a)
                       => Graph (Weighted d) a
                       -> VertexSelector a
                       -> VertexSelector a
-                      -> HashMap (a,a) (Maybe Int)  -- ^ (lazy) HashMap
+                      -> Map (a,a) (Maybe Int)
 shortestPathsDijkstra g vf vt =
   let ls = unsafePerformIO $ do
              ma <- newMatrix 0 0
@@ -188,10 +188,10 @@ shortestPathsDijkstra g vf vt =
              matrixToList ma
       nf = selectedVertices g vf
       nt = selectedVertices g vt
-  in  HML.fromList [ ((f,t), len)
-                   | (f,lf)  <- zip nf ls
-                   , (t,len) <- zip nt (map roundMaybe lf)
-                   ]
+  in  M.fromList [ ((f,t), len)
+                 | (f,lf)  <- zip nf ls
+                 , (t,len) <- zip nt (map roundMaybe lf)
+                 ]
 
 {-
 2.3. igraph_shortest_paths_bellman_ford — Weighted shortest paths from some sources allowing negative weights.
@@ -206,7 +206,7 @@ shortestPathsBellmanFord :: (Ord a, Hashable a)
                          => Graph (Weighted d) a
                          -> VertexSelector a
                          -> VertexSelector a
-                         -> HashMap (a,a) (Maybe Int) -- ^ (lazy) HashMap
+                         -> Map (a,a) (Maybe Int)
 shortestPathsBellmanFord g vf vt =
   let ls = unsafePerformIO $ do
              ma <- newMatrix 0 0
@@ -225,10 +225,10 @@ shortestPathsBellmanFord g vf vt =
              matrixToList ma
       nf = selectedVertices g vf
       nt = selectedVertices g vt
-  in  HML.fromList [ ((f,t), len)
-                   | (f,lf)  <- zip nf ls
-                   , (t,len) <- zip nt (map roundMaybe lf)
-                   ]
+  in  M.fromList [ ((f,t), len)
+                 | (f,lf)  <- zip nf ls
+                 , (t,len) <- zip nt (map roundMaybe lf)
+                 ]
 
 {-
 2.4. igraph_shortest_paths_johnson — Calculate shortest paths from some sources using Johnson's algorithm.
@@ -243,7 +243,7 @@ shortestPathsJohnson :: (Ord a, Hashable a)
                      => Graph (Weighted d) a
                      -> VertexSelector a
                      -> VertexSelector a
-                     -> HashMap (a,a) (Maybe Int) -- ^ (lazy) HashMap
+                     -> Map (a,a) (Maybe Int)
 shortestPathsJohnson g vf vt =
   let ls = unsafePerformIO $ do
              ma <- newMatrix 0 0
@@ -261,10 +261,10 @@ shortestPathsJohnson g vf vt =
              matrixToList ma
       nf = selectedVertices g vf
       nt = selectedVertices g vt
-  in  HML.fromList [ ((f,t), len)
-                   | (f,lf)  <- zip nf ls
-                   , (t,len) <- zip nt (map roundMaybe lf)
-                   ]
+  in  M.fromList [ ((f,t), len)
+                 | (f,lf)  <- zip nf ls
+                 , (t,len) <- zip nt (map roundMaybe lf)
+                 ]
 
 {-
 2.5. igraph_get_shortest_paths — Calculates the shortest paths from/to one vertex.
