@@ -61,8 +61,18 @@ withWeights g io = do
   v <- listToVector $ map getWeight (Set.toList (edges g))
   withVector v io
 
+withOptionalWeights :: Graph d a -> (VectorPtr -> IO res) -> IO res
+withOptionalWeights g@(G _) io = do
+  let mws = getWeights g
+  case mws of
+       Nothing -> io nullPtr
+       Just ws -> listToVector ws >>= flip withVector io
+
 foreign import ccall "edges"
   c_igraph_edges :: GraphPtr -> IO VectorPtrPtr
+
+--------------------------------------------------------------------------------
+-- (orphan) graph instances
 
 instance Show a => Show (Graph U a) where
   show (G g) = show (graphEdges g)

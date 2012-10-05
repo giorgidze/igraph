@@ -2,12 +2,10 @@ module Data.IGraph.Types where
 
 import Data.Hashable
 import Data.HashMap.Strict (HashMap)
-import Data.HashSet (HashSet)
+import Data.HashSet as S (HashSet, foldr)
 
 import Foreign.Ptr
 import Foreign.ForeignPtr
-
-import Data.IGraph.Internal.Constants
 
 --------------------------------------------------------------------------------
 -- C stuff
@@ -62,6 +60,7 @@ class (Eq a, Hashable a, Eq (Edge d a), Hashable (Edge d a)) => E d a where
   edgeFrom   :: Edge d a -> a
   edgeTo     :: Edge d a -> a
   isDirected :: Graph d a -> Bool
+  getWeights :: Graph d a -> Maybe [Int]
 
 -- | Undirected graph
 data U
@@ -72,6 +71,7 @@ instance (Eq a, Hashable a) => E U a where
   toEdge = U_Edge
   edgeFrom (U_Edge a _) = a
   edgeTo   (U_Edge _ b) = b
+  getWeights _ = Nothing
 
 instance Eq a => Eq (Edge U a) where
   (U_Edge a b) == (U_Edge c d) = (a,b) == (c,d) || (a,b) == (d,c)
@@ -91,6 +91,7 @@ instance (Eq a, Hashable a) => E D a where
   toEdge = D_Edge
   edgeFrom (D_Edge a _) = a
   edgeTo   (D_Edge _ b) = b
+  getWeights _ = Nothing
 
 instance Hashable a => Hashable (Edge D a) where
   hash (D_Edge a b) = hash (a,b)
@@ -118,6 +119,7 @@ instance (E d a, IsUnweighted d) => E (Weighted d) a where
   toEdge a b = W (toEdge a b) 0
   edgeFrom (W e _) = edgeFrom e
   edgeTo   (W e _) = edgeTo   e
+  getWeights (G g)   = Just $ S.foldr (\(W _  w) r -> w:r) [] (graphEdges g)
 
 instance E d a => Eq (Edge (Weighted d) a) where
   (W e w) == (W e' w') = w == w' && e == e'

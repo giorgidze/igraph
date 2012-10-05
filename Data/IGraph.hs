@@ -54,9 +54,8 @@ module Data.IGraph
   -- , decompose
   , Connectedness(..)
 
-  --, initIGraph
-  --, setVertexIds, setVertexIds'
-  --, getVertexIds, getVertexIds'
+    -- ** 13\.5 Centrality Measures
+  , closeness
   ) where
 
 import Data.IGraph.Internal
@@ -884,11 +883,26 @@ necessary? I dunno :) no.
                        const igraph_vs_t vids, igraph_neimode_t mode, 
                        const igraph_vector_t *weights);
 
-  -}
+  DONE: -}
 
--- HOW to handle weights?
---foreign import ccall "closeness"
-  --c_igraph_closeness :: GraphPtr -> VectorPtr -> VsPtr -> CInt -> VectorPtr -> IO CInt
+foreign import ccall "closeness"
+  c_igraph_closeness :: GraphPtr -> VectorPtr -> VsPtr -> CInt -> VectorPtr -> IO CInt
+
+closeness :: Ord a => Graph d a -> VertexSelector a -> Map a Double
+closeness g vs = unsafePerformIO $ do
+  v  <- newVector 0
+  _e <- withGraph g $ \gp ->
+        withOptionalWeights g $ \wp ->
+        withVs vs g $ \vsp ->
+        withVector v $ \vp ->
+          c_igraph_closeness
+            gp
+            vp
+            vsp
+            (fromIntegral $ fromEnum Out)
+            wp
+  scores <- vectorToList v
+  return $ M.fromList $ zip (selectedVertices g vs) scores
 
 {-
 
