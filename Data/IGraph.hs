@@ -25,7 +25,7 @@ module Data.IGraph
     -- * Chapter 11. Vertex and Edge Selectors and Sequences, Iterators
 
     -- ** 11\.2 Vertex selector constructors
-  , VertexSelector(..), NeiMode(..)
+  , VertexSelector(..) --, NeiMode(..)
 
     -- ** 11\.3. Generic vertex selector operations
   , vsSize, selectedVertices
@@ -51,7 +51,7 @@ module Data.IGraph
   , subcomponent
   -- , subgraph
   , isConnected
-  --, decompose
+  -- , decompose
   , Connectedness(..)
 
   --, initIGraph
@@ -130,9 +130,8 @@ shortestPaths :: (Ord a, Hashable a)
               => Graph d a
               -> VertexSelector a
               -> VertexSelector a
-              -> NeiMode
               -> HashMap (a,a) (Maybe Int) -- ^ (lazy) `HashMap'
-shortestPaths g vf vt m =
+shortestPaths g vf vt =
   let ls = unsafePerformIO $ do
              ma <- newMatrix 0 0
              _e <- withGraph g $ \gp ->
@@ -144,7 +143,7 @@ shortestPaths g vf vt m =
                        mp
                        vfp
                        vtp
-                       (fromIntegral $ fromEnum m)
+                       (fromIntegral $ fromEnum Out)
              matrixToList ma
       nf = selectedVertices g vf
       nt = selectedVertices g vt
@@ -170,9 +169,8 @@ shortestPathsDijkstra :: (Ord a, Hashable a)
                       => Graph (Weighted d) a
                       -> VertexSelector a
                       -> VertexSelector a
-                      -> NeiMode
                       -> HashMap (a,a) (Maybe Int)  -- ^ (lazy) HashMap
-shortestPathsDijkstra g vf vt m =
+shortestPathsDijkstra g vf vt =
   let ls = unsafePerformIO $ do
              ma <- newMatrix 0 0
              _e <- withGraph g $ \gp ->
@@ -186,7 +184,7 @@ shortestPathsDijkstra g vf vt m =
                        vfp
                        vtp
                        wp
-                       (fromIntegral $ fromEnum m)
+                       (fromIntegral $ fromEnum Out)
              matrixToList ma
       nf = selectedVertices g vf
       nt = selectedVertices g vt
@@ -208,9 +206,8 @@ shortestPathsBellmanFord :: (Ord a, Hashable a)
                          => Graph (Weighted d) a
                          -> VertexSelector a
                          -> VertexSelector a
-                         -> NeiMode
                          -> HashMap (a,a) (Maybe Int) -- ^ (lazy) HashMap
-shortestPathsBellmanFord g vf vt m =
+shortestPathsBellmanFord g vf vt =
   let ls = unsafePerformIO $ do
              ma <- newMatrix 0 0
              _e <- withGraph g $ \gp ->
@@ -224,7 +221,7 @@ shortestPathsBellmanFord g vf vt m =
                        vfp
                        vtp
                        wp
-                       (fromIntegral $ fromEnum m)
+                       (fromIntegral $ fromEnum Out)
              matrixToList ma
       nf = selectedVertices g vf
       nt = selectedVertices g vt
@@ -281,9 +278,8 @@ foreign import ccall "get_shortest_paths"
 getShortestPaths :: Graph d a
                  -> a                     -- ^ from
                  -> VertexSelector a      -- ^ to
-                 -> NeiMode
                  -> [ ([a],[Edge d a]) ]  -- ^ list of @(vertices, edges)@
-getShortestPaths g f vt m =
+getShortestPaths g f vt =
   let mfi = nodeToId g f
    in case mfi of
            Nothing -> error "getShortestPaths: Invalid node"
@@ -300,7 +296,7 @@ getShortestPaths g f vt m =
                          vpep
                          (fromIntegral fi)
                          vtp
-                         (fromIntegral $ fromEnum m)
+                         (fromIntegral $ fromEnum Out)
              v <- vectorPtrToVertices g vpv
              e <- vectorPtrToEdges    g vpe
              return $ zip v e
@@ -314,8 +310,8 @@ getShortestPaths g f vt m =
 foreign import ccall "igraph_get_shortest_path"
   c_igraph_get_shortest_path :: GraphPtr -> VectorPtr -> VectorPtr -> CInt -> CInt -> CInt -> IO CInt
 
-getShortestPath :: Graph d a -> a -> a -> NeiMode -> ([a],[Edge d a])
-getShortestPath g n1 n2 m =
+getShortestPath :: Graph d a -> a -> a -> ([a],[Edge d a])
+getShortestPath g n1 n2 =
   let mi1 = nodeToId g n1
       mi2 = nodeToId g n2
   in  case (mi1, mi2) of
@@ -324,7 +320,7 @@ getShortestPath g n1 n2 m =
                v1 <- listToVector ([] :: [Int])
                v2 <- listToVector ([] :: [Int])
                e <- withVector v1 $ \vp1 -> withVector v2 $ \vp2 ->
-                     c_igraph_get_shortest_path gp vp1 vp2 (fromIntegral i1) (fromIntegral i2) (fromIntegral (fromEnum m))
+                     c_igraph_get_shortest_path gp vp1 vp2 (fromIntegral i1) (fromIntegral i2) (fromIntegral (fromEnum Out))
                if e == 0 then do
                    vert <- vectorToVertices g v1
                    edgs <- vectorToEdges    g v2
@@ -347,9 +343,8 @@ foreign import ccall "get_shortest_paths_dijkstra"
 getShortestPathsDijkstra :: Graph (Weighted d) a
                          -> a                     -- ^ from
                          -> VertexSelector a      -- ^ to
-                         -> NeiMode
                          -> [ ([a],[Edge (Weighted d) a]) ]  -- ^ list of @(vertices, edges)@
-getShortestPathsDijkstra g f vt m =
+getShortestPathsDijkstra g f vt =
   let mfi = nodeToId g f
    in case mfi of
            Nothing -> error "getShortestPathsDijkstra: Invalid node"
@@ -368,7 +363,7 @@ getShortestPathsDijkstra g f vt m =
                        (fromIntegral fi)
                        vtp
                        wp
-                       (fromIntegral $ fromEnum m)
+                       (fromIntegral $ fromEnum Out)
              v <- vectorPtrToVertices g vpv
              e <- vectorPtrToEdges    g vpe
              return $ zip v e
@@ -382,8 +377,8 @@ foreign import ccall "igraph_get_shortest_path_dijkstra"
   c_igraph_get_shortest_path_dijkstra :: GraphPtr -> VectorPtr -> VectorPtr -> CInt
                                       -> CInt -> VectorPtr -> CInt -> IO CInt
 
-getShortestPathDijkstra :: Graph (Weighted d) a -> a -> a -> NeiMode -> ([a],[Edge (Weighted d) a])
-getShortestPathDijkstra g n1 n2 m =
+getShortestPathDijkstra :: Graph (Weighted d) a -> a -> a -> ([a],[Edge (Weighted d) a])
+getShortestPathDijkstra g n1 n2 =
   let mi1 = nodeToId g n1
       mi2 = nodeToId g n2
   in  case (mi1, mi2) of
@@ -401,7 +396,7 @@ getShortestPathDijkstra g n1 n2 m =
                        (fromIntegral i1)
                        (fromIntegral i2)
                        wp
-                       (fromIntegral $ fromEnum m)
+                       (fromIntegral $ fromEnum Out)
              if e == 0 then do
                 vert <- vectorToVertices g v1
                 edgs <- vectorToEdges    g v2
@@ -427,10 +422,9 @@ foreign import ccall "get_all_shortest_paths"
 getAllShortestPaths :: Graph d a
                     -> a                  -- ^ from
                     -> VertexSelector a   -- ^ to
-                    -> NeiMode
                     -> [[a]]  -- ^ list of vertices along the shortest path from
                               -- @from@ to each other (reachable) vertex
-getAllShortestPaths g f vt m =
+getAllShortestPaths g f vt =
   let mfi = nodeToId g f
    in case mfi of
            Nothing -> error "getAllShortestPaths: Invalid node"
@@ -445,7 +439,7 @@ getAllShortestPaths g f vt m =
                           nullPtr -- NULL
                           (fromIntegral fi)
                           vtp
-                          (fromIntegral $ fromEnum m)
+                          (fromIntegral $ fromEnum Out)
              vectorPtrToVertices g vpr
 
 {-
@@ -467,10 +461,9 @@ foreign import ccall "get_all_shortest_paths_dijkstra"
 getAllShortestPathsDijkstra :: Graph (Weighted d) a
                             -> a                  -- ^ from
                             -> VertexSelector a   -- ^ to
-                            -> NeiMode
                             -> [[a]]  -- ^ list of vertices along the shortest path from
                                       -- @from@ to each other (reachable) vertex
-getAllShortestPathsDijkstra g f vt m =
+getAllShortestPathsDijkstra g f vt =
   let mfi = nodeToId g f
    in case mfi of
            Nothing -> error "getAllShortestPaths: Invalid node"
@@ -487,7 +480,7 @@ getAllShortestPathsDijkstra g f vt m =
                         (fromIntegral fi)
                         vtp
                         wp
-                        (fromIntegral $ fromEnum m)
+                        (fromIntegral $ fromEnum Out)
              vectorPtrToVertices g vpr
 
 {-
@@ -676,8 +669,8 @@ girth' g = unsafePerformIO $ do
 foreign import ccall "eccentricity"
   c_igraph_eccentricity :: GraphPtr -> VectorPtr -> VsPtr -> CInt -> IO CInt
 
-eccentricity :: Graph d a -> VertexSelector a -> NeiMode -> [(a,Int)]
-eccentricity g vs m = unsafePerformIO $ do
+eccentricity :: Graph d a -> VertexSelector a -> [(a,Int)]
+eccentricity g vs = unsafePerformIO $ do
   v  <- newVector 0
   _e <- withGraph g $ \gp ->
           withVs vs g $ \vsp ->
@@ -686,7 +679,7 @@ eccentricity g vs m = unsafePerformIO $ do
                 gp
                 vp
                 vsp
-                (fromIntegral $ fromEnum m)
+                (fromIntegral $ fromEnum Out)
   l <- map round `fmap` vectorToList v
   return $ zip (selectedVertices g vs) l
 
@@ -700,14 +693,14 @@ eccentricity g vs m = unsafePerformIO $ do
 foreign import ccall "igraph_radius"
   c_igraph_radius :: GraphPtr -> Ptr CDouble -> CInt -> IO CInt
 
-radius :: Graph d a -> NeiMode -> Int
-radius g m = unsafePerformIO $ do
+radius :: Graph d a -> Int
+radius g = unsafePerformIO $ do
   alloca $ \dp -> do
     _e <- withGraph g $ \gp ->
             c_igraph_radius
               gp
               dp
-              (fromIntegral $ fromEnum m)
+              (fromIntegral $ fromEnum Out)
     round `fmap` peek dp
 
 
@@ -733,11 +726,11 @@ radius g m = unsafePerformIO $ do
 foreign import ccall "neighborhood"
   c_igraph_neighborhood :: GraphPtr d a -> VectorPtrPtr -> VsPtr -> CInt -> CInt -> IO CInt
 
-neighborhood :: VertexSelector a -> Int -> NeiMode -> IGraph (Graph d a) [[a]]
-neighborhood vs o m = runUnsafeIO $ \g -> do
+neighborhood :: VertexSelector a -> Int -> IGraph (Graph d a) [[a]]
+neighborhood vs o = runUnsafeIO $ \g -> do
   v        <- newVectorPtr 10
   (_e, g') <- withGraph g $ \gp -> withVs vs g $ \vsp -> withVectorPtr v $ \vp ->
-    c_igraph_neighborhood gp vp vsp (fromIntegral o) (fromIntegral (fromEnum m))
+    c_igraph_neighborhood gp vp vsp (fromIntegral o) (fromIntegral (fromEnum Out))
   ids      <- vectorPtrToList v
   return (map (map (idToNode'' g . round)) ids, g')
 
@@ -761,19 +754,17 @@ neighborhood vs o m = runUnsafeIO $ \g -> do
 
 4.1. igraph_subcomponent — The vertices in the same component as a given vertex.
 
-  DONE:
-
--}
+  DONE: -}
 
 foreign import ccall "igraph_subcomponent"
   c_igraph_subcomponent :: GraphPtr -> VectorPtr -> CDouble -> CInt -> IO CInt
 
-subcomponent :: Graph d a -> a -> NeiMode -> [a]
-subcomponent g a m = case nodeToId g a of
+subcomponent :: Graph d a -> a -> [a]
+subcomponent g a = case nodeToId g a of
   Just i -> unsafePerformIO $ do
     v <- newVector 0
     _ <- withGraph g $ \gp -> withVector v $ \vp ->
-      c_igraph_subcomponent gp vp (fromIntegral i) (fromIntegral $ fromEnum m)
+      c_igraph_subcomponent gp vp (fromIntegral i) (fromIntegral $ fromEnum Out)
     vectorToVertices g v
   _ -> []
 
@@ -844,30 +835,27 @@ isConnected g c = unsafePerformIO $ withGraph g $ \gp -> alloca $ \b -> do
 
 4.7. igraph_decompose — Decompose a graph into connected components.
 
-  DONE: -}
-
-{- Somehow doesn't work:
-
 foreign import ccall "igraph_decompose"
   c_igraph_decompose :: GraphPtr -> VectorPtrPtr -> CInt -> CLong -> CInt -> IO CInt
 
-decompose :: Graph d a -> Connectedness -> Int -> Int -> [[a]]
+decompose :: Graph d a -> Connectedness -> Int -> Int -> [Graph d a]
 decompose g m ma mi = unsafePerformIO $ do
-  initIGraph
   vp <- newVectorPtr 0
-  _e <- withGraph_ g $ \gp -> withVectorPtr vp $ \vpp ->
-    c_igraph_decompose gp vpp (fromIntegral $ fromEnum m) (fromIntegral ma) (fromIntegral mi)
-  vectorPtrToVertices g vp
-
--}
-
-{-
+  _e <- withGraph g $ \gp ->
+        withVectorPtr vp $ \vpp ->
+          c_igraph_decompose
+            gp
+            vpp
+            (fromIntegral $ fromEnum m)
+            (fromIntegral ma)
+            (fromIntegral mi)
+  -- vectorPtrToVertices g vp -- wrong since the vectorptr contains graphs!
 
 4.8. igraph_decompose_destroy — Free the memory allocated by igraph_decompose().
 
   void igraph_decompose_destroy(igraph_vector_ptr_t *complist);
 
-necessary? I dunno :)
+necessary? I dunno :) no.
 
 4.9. igraph_biconnected_components — Calculate biconnected components
 

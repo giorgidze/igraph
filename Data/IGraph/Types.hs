@@ -136,5 +136,5 @@ data VertexSelector a
   | VsNone
   | Vs1      a
   | VsList   [a]
-  | VsAdj    a NeiMode
-  | VsNonAdj a NeiMode
+  | VsAdj    a
+  | VsNonAdj a

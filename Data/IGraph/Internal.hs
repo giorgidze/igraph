@@ -14,6 +14,7 @@ import Foreign.C
 import System.IO.Unsafe (unsafePerformIO)
 
 import Data.IGraph.Types
+import Data.IGraph.Internal.Constants
 
 nodeToId'' :: Graph d a -> a -> Int
 nodeToId'' (G g) n = case Map.lookup n (graphNodeToId g) of
@@ -126,12 +127,12 @@ withVs vs g f = do
   -- bind to C vertex selector pointer
   _e <- withVs' fvs $ \vsp ->
     case vs of
-         VsAll        -> c_igraph_vs_all    vsp
-         VsNone       -> c_igraph_vs_none   vsp
-         VsAdj    a m -> c_igraph_vs_adj    vsp (ident a) (fromIntegral $ fromEnum m)
-         VsNonAdj a m -> c_igraph_vs_nonadj vsp (ident a) (fromIntegral $ fromEnum m)
-         Vs1      a   -> c_igraph_vs_1      vsp (ident a)
-         VsList   l   -> do
+         VsAll      -> c_igraph_vs_all    vsp
+         VsNone     -> c_igraph_vs_none   vsp
+         VsAdj    a -> c_igraph_vs_adj    vsp (ident a) (fromIntegral $ fromEnum Out)
+         VsNonAdj a -> c_igraph_vs_nonadj vsp (ident a) (fromIntegral $ fromEnum Out)
+         Vs1      a -> c_igraph_vs_1      vsp (ident a)
+         VsList   l -> do
            v <- listToVector (map ident l)
            withVector v $ c_igraph_vs_vector vsp
   --fvs <- vs (nodeToId' g)
