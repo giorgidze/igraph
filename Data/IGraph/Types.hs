@@ -82,6 +82,9 @@ instance Eq a => Eq (Edge U a) where
 instance Hashable a => Hashable (Edge U a) where
   hash (U_Edge a b) = hash (a,b) + hash (b,a) -- to make sure (a,b) receives the same hash as (b,a)
 
+instance Ord a => Ord (Edge U a) where
+  (U_Edge a b) <= (U_Edge c d) = (a,b) <= (c,d)
+
 instance Show a => Show (Edge U a) where
   show (U_Edge a b) = "Edge U {" ++ show a ++ " <-> " ++ show b ++ "}"
 
@@ -101,6 +104,9 @@ instance Hashable a => Hashable (Edge D a) where
 
 instance Show a => Show (Edge D a) where
   show (D_Edge a b) = "Edge D {" ++ show a ++ " -> " ++ show b ++ "}"
+
+instance Ord a => Ord (Edge D a) where
+  (D_Edge a b) <= (D_Edge c d) = (a,b) <= (c,d)
 
 
 class IsUnweighted d where
@@ -132,6 +138,10 @@ instance E d a => Hashable (Edge (Weighted d) a) where
 
 instance Show (Edge d a) => Show (Edge (Weighted d) a) where
   show (W e w) = show e ++ "(" ++ show w ++ ")"
+
+instance (E d a, Ord (Edge d a)) => Ord (Edge (Weighted d) a) where
+  (W e1 w1) <= (W e2 w2) = (e1,w1) <= (e2,w2)
+
 
 --------------------------------------------------------------------------------
 -- Vertex selectors
