@@ -54,6 +54,7 @@ module Data.IGraph
   , isConnected
   -- , decompose
   , Connectedness(..)
+  , articulationPoints
 
     -- ** 13\.5 Centrality Measures
   , closeness
@@ -865,7 +866,7 @@ decompose g m ma mi = unsafePerformIO $ do
 
   void igraph_decompose_destroy(igraph_vector_ptr_t *complist);
 
-necessary? I dunno :) no.
+necessary? no.
 
 4.9. igraph_biconnected_components — Calculate biconnected components
 
@@ -881,7 +882,20 @@ necessary? I dunno :) no.
   int igraph_articulation_points(const igraph_t *graph,
                                  igraph_vector_t *res);
 
--}
+  DONE: -}
+
+foreign import ccall "igraph_articulation_points"
+  c_igraph_articulation_points :: GraphPtr -> VectorPtr -> IO CInt
+
+articulationPoints :: Graph d a -> [a]
+articulationPoints g = unsafePerformIO $ do
+  v  <- newVector 0
+  _e <- withGraph g $ \gp ->
+        withVector v $ \vp ->
+          c_igraph_articulation_points
+            gp
+            vp
+  vectorToVertices g v
 
 --------------------------------------------------------------------------------
 -- 13.5 Centrality Measures
