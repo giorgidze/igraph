@@ -61,7 +61,7 @@ module Data.IGraph
   , betweenness, edgeBetweenness
     --pagerank stuff here
   , constraint
-  --, maxdegree
+  , maxdegree
   , strength
   ) where
 
@@ -1070,9 +1070,8 @@ constraint g vs = unsafePerformIO $ do
 
   DONE: -}
 
-{-
 foreign import ccall "maxdegree"
-  c_igraph_maxdegree :: GraphPtr -> Ptr Int -> VsPtr -> CInt -> Bool -> IO CInt
+  c_igraph_maxdegree :: GraphPtr -> Ptr CInt -> VsPtr -> CInt -> Bool -> IO CInt
 
 -- | TODO: Result is wrong
 maxdegree :: Graph d a
@@ -1089,8 +1088,7 @@ maxdegree g vs b = unsafePerformIO $
             vsp
             (getNeiMode g)
             b
-    peek ip
--}
+    fromIntegral `fmap` peek ip
 
 {-
 5.10. igraph_strength — Strength of the vertices, weighted vertex degree in other words.
