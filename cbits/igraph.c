@@ -300,3 +300,28 @@ int strength(const igraph_t *graph, igraph_vector_t *res,
 {
     return igraph_strength(graph, res, *vids, mode, loops, weights);
 }
+
+/*******************************************************************************
+ *
+ * 13.6 Estimating Centrality Measures
+ *
+ */
+
+int closeness_estimate(const igraph_t *graph, igraph_vector_t *res, 
+                       const igraph_vs_t *vids, igraph_neimode_t mode,
+                       igraph_real_t cutoff,
+                       const igraph_vector_t *weights)
+{
+    return igraph_closeness_estimate(graph, res, *vids, mode, cutoff, weights);
+}
+
+int betweenness_estimate(const igraph_t *graph,
+                         igraph_vector_t *res, 
+                         const igraph_vs_t *vids,
+                         igraph_bool_t directed,
+                         igraph_real_t cutoff, 
+                         const igraph_vector_t *weights, 
+                         igraph_bool_t nobigint)
+{
+    return igraph_betweenness_estimate(graph, res, *vids, directed, cutoff, weights, nobigint);
+}

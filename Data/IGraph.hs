@@ -63,6 +63,11 @@ module Data.IGraph
   , constraint
   , maxdegree
   , strength
+
+    -- ** 13\.6 Estimating Centrality Measures
+  , closenessEstimate
+  , betweennessEstimate
+  , edgeBetweennessEstimate
   ) where
 
 import Data.IGraph.Internal
@@ -1169,6 +1174,32 @@ strength g vs b = unsafePerformIO $ do
                                 igraph_real_t cutoff,
                                 const igraph_vector_t *weights);
 
+  DONE: -}
+
+foreign import ccall "closeness_estimate"
+  c_igraph_closeness_estimate :: GraphPtr -> VectorPtr -> VsPtr -> CInt -> CDouble -> VectorPtr -> IO CInt
+
+closenessEstimate :: Ord a => Graph d a
+                  -> VertexSelector a
+                  -> Int  -- ^ cutoff
+                  -> Map a Double
+closenessEstimate g vs cutoff = unsafePerformIO $ do
+  v  <- newVector 0
+  _e <- withGraph g $ \gp ->
+        withVector v $ \vp ->
+        withVs vs g $ \vsp ->
+        withOptionalWeights g $ \wp ->
+          c_igraph_closeness_estimate
+            gp
+            vp
+            vsp
+            (getNeiMode g)
+            (fromIntegral cutoff)
+            wp
+  scores <- vectorToList v
+  return $ M.fromList $ zip (selectedVertices g vs) scores
+
+{-
 6.2. igraph_betweenness_estimate — Estimated betweenness centrality of some vertices.
 
   int igraph_betweenness_estimate(const igraph_t *graph,
@@ -1178,7 +1209,35 @@ strength g vs b = unsafePerformIO $ do
                                   igraph_real_t cutoff, 
                                   const igraph_vector_t *weights, 
                                   igraph_bool_t nobigint);
+  DONE: -}
 
+foreign import ccall "betweenness_estimate"
+  c_igraph_betweenness_estimate :: GraphPtr -> VectorPtr -> VsPtr -> Bool -> CDouble
+                                -> VectorPtr -> Bool -> IO CInt
+
+betweennessEstimate :: Ord a
+                    => Graph d a
+                    -> VertexSelector a
+                    -> Int -- ^ cutoff
+                    -> Map a Double
+betweennessEstimate g@(G _) vs cutoff = unsafePerformIO $ do
+  v  <- newVector 0
+  _e <- withGraph g $ \gp ->
+        withVector v $ \vp ->
+        withVs vs g $ \vsp ->
+        withOptionalWeights g $ \wp ->
+          c_igraph_betweenness_estimate
+            gp
+            vp
+            vsp
+            (isDirected g)
+            (fromIntegral cutoff)
+            wp
+            True -- should be OK for most graphs
+  scores <- vectorToList v
+  return $ M.fromList $ zip (selectedVertices g vs) scores
+
+{-
 6.3. igraph_edge_betweenness_estimate — Estimated betweenness centrality of the edges.
 
   int igraph_edge_betweenness_estimate(const igraph_t *graph,
@@ -1186,8 +1245,28 @@ strength g vs b = unsafePerformIO $ do
                                        igraph_bool_t directed,
                                        igraph_real_t cutoff,
                                        const igraph_vector_t *weights);
+  DONE: -}
 
--}
+foreign import ccall "igraph_edge_betweenness_estimate"
+  c_igraph_edge_betweenness_estimate :: GraphPtr -> VectorPtr -> Bool -> CDouble -> VectorPtr -> IO CInt
+
+edgeBetweennessEstimate :: Ord (Edge d a)
+                        => Graph d a
+                        -> Int -- ^ cutoff
+                        -> Map (Edge d a) Double
+edgeBetweennessEstimate g@(G _) cutoff = unsafePerformIO $ do
+  v  <- newVector 0
+  _e <- withGraph g $ \gp ->
+        withVector v $ \vp ->
+        withOptionalWeights g $ \wp ->
+          c_igraph_edge_betweenness_estimate
+            gp
+            vp
+            (isDirected g)
+            (fromIntegral cutoff)
+            wp
+  scores <- vectorToList v
+  return $ M.fromList $ zip (F.toList $ edges g) scores
 
 --------------------------------------------------------------------------------
 -- 13.7 Centralization
