@@ -58,6 +58,11 @@ module Data.IGraph
 
     -- ** 13\.5 Centrality Measures
   , closeness
+  , betweenness, edgeBetweenness
+    --pagerank stuff here
+  , constraint
+  --, maxdegree
+  , strength
   ) where
 
 import Data.IGraph.Internal
@@ -67,6 +72,7 @@ import Data.IGraph.Types
 import Data.Hashable
 import Data.Map (Map)
 import qualified Data.Map as M
+import qualified Data.Foldable as F
 
 import Foreign hiding (unsafePerformIO)
 import Foreign.C
@@ -897,6 +903,7 @@ articulationPoints g = unsafePerformIO $ do
             vp
   vectorToVertices g v
 
+
 --------------------------------------------------------------------------------
 -- 13.5 Centrality Measures
 
@@ -933,21 +940,70 @@ closeness g vs = unsafePerformIO $ do
 
 5.2. igraph_betweenness — Betweenness centrality of some vertices.
 
-  int igraph_betweenness(const igraph_t *graph, igraph_vector_t *res,
-                         const igraph_vs_t vids, igraph_bool_t directed, 
-                         const igraph_vector_t* weights, igraph_bool_t nobigint);
+  int igraph_betweenness(const igraph_t *graph,
+                         igraph_vector_t *res,
+                         const igraph_vs_t vids,
+                         igraph_bool_t directed, 
+                         const igraph_vector_t* weights,
+                         igraph_bool_t nobigint);
 
+  DONE: -}
+
+foreign import ccall "betweenness"
+  c_igraph_betweenness :: GraphPtr -> VectorPtr -> VsPtr -> Bool -> VectorPtr -> Bool -> IO CInt
+
+betweenness :: Ord a => Graph d a -> VertexSelector a -> Map a Double
+betweenness g vs = unsafePerformIO $ do
+  v  <- newVector 0
+  _e <- withGraph g $ \gp ->
+        withOptionalWeights g $ \wp ->
+        withVs vs g $ \vsp ->
+        withVector v $ \vp ->
+          c_igraph_betweenness
+            gp
+            vp
+            vsp
+            True -- should be OK for all graphs
+            wp
+            True -- should be OK for all graphs
+  scores <- vectorToList v
+  return $ M.fromList $ zip (selectedVertices g vs) scores
+
+{-
 5.3. igraph_edge_betweenness — Betweenness centrality of the edges.
 
   int igraph_edge_betweenness(const igraph_t *graph, igraph_vector_t *result,
                               igraph_bool_t directed, 
                               const igraph_vector_t *weights);
 
+  DONE: -}
+
+foreign import ccall "igraph_edge_betweenness"
+  c_igraph_edge_betweenness :: GraphPtr -> VectorPtr -> Bool -> VectorPtr -> IO CInt
+
+edgeBetweenness :: Ord (Edge d a) => Graph d a -> Map (Edge d a) Double
+edgeBetweenness g = unsafePerformIO $ do
+  v  <- newVector 0
+  _e <- withGraph g $ \gp ->
+        withOptionalWeights g $ \wp ->
+        withVector v $ \vp ->
+          c_igraph_edge_betweenness
+            gp
+            vp
+            True
+            wp
+  scores <- vectorToList v
+  return $ M.fromList $ zip (F.toList $ edges g) scores
+
+{-
 5.4. igraph_pagerank — Calculates the Google PageRank for the specified vertices.
 
-  int igraph_pagerank(const igraph_t *graph, igraph_vector_t *vector,
-                      igraph_real_t *value, const igraph_vs_t vids,
-                      igraph_bool_t directed, igraph_real_t damping, 
+  int igraph_pagerank(const igraph_t *graph,
+                      igraph_vector_t *vector,
+                      igraph_real_t *value,
+                      const igraph_vs_t vids,
+                      igraph_bool_t directed,
+                      igraph_real_t damping, 
                       const igraph_vector_t *weights,
                       igraph_arpack_options_t *options);
 
@@ -978,21 +1034,97 @@ closeness g vs = unsafePerformIO $ do
 
 5.8. igraph_constraint — Burt's constraint scores.
 
-  int igraph_constraint(const igraph_t *graph, igraph_vector_t *res,
-                        igraph_vs_t vids, const igraph_vector_t *weights);
+  int igraph_constraint(const igraph_t *graph,
+                        igraph_vector_t *res,
+                        igraph_vs_t vids,
+                        const igraph_vector_t *weights);
 
+  DONE: -}
+
+foreign import ccall "constraint"
+  c_igraph_constraint :: GraphPtr -> VectorPtr -> VsPtr -> VectorPtr -> IO CInt
+
+constraint :: Ord a => Graph d a -> VertexSelector a -> Map a Double
+constraint g vs = unsafePerformIO $ do
+  v  <- newVector 0
+  _e <- withGraph g $ \gp ->
+        withOptionalWeights g $ \wp ->
+        withVector v $ \vp ->
+        withVs vs g $ \vsp ->
+          c_igraph_constraint
+            gp
+            vp
+            vsp
+            wp
+  scores <- vectorToList v
+  return $ M.fromList $ zip (selectedVertices g vs) scores
+
+{-
 5.9. igraph_maxdegree — Calculate the maximum degree in a graph (or set of vertices).
 
-  int igraph_maxdegree(const igraph_t *graph, igraph_integer_t *res,
-                       igraph_vs_t vids, igraph_neimode_t mode, 
+  int igraph_maxdegree(const igraph_t *graph,
+                       igraph_integer_t *res,
+                       igraph_vs_t vids,
+                       igraph_neimode_t mode, 
                        igraph_bool_t loops);
 
+  DONE: -}
+
+{-
+foreign import ccall "maxdegree"
+  c_igraph_maxdegree :: GraphPtr -> Ptr Int -> VsPtr -> CInt -> Bool -> IO CInt
+
+-- | TODO: Result is wrong
+maxdegree :: Graph d a
+          -> VertexSelector a
+          -> Bool -- ^ count self-loops?
+          -> Int
+maxdegree g vs b = unsafePerformIO $
+  withGraph g $ \gp ->
+  withVs vs g $ \vsp ->
+  alloca $ \ip -> do
+    _e <- c_igraph_maxdegree
+            gp
+            ip
+            vsp
+            (getNeiMode g)
+            b
+    peek ip
+-}
+
+{-
 5.10. igraph_strength — Strength of the vertices, weighted vertex degree in other words.
 
   int igraph_strength(const igraph_t *graph, igraph_vector_t *res,
                       const igraph_vs_t vids, igraph_neimode_t mode,
                       igraph_bool_t loops, const igraph_vector_t *weights);
+  DONE: -}
 
+foreign import ccall "strength"
+  c_igraph_strength :: GraphPtr -> VectorPtr -> VsPtr -> CInt -> Bool -> VectorPtr -> IO CInt
+
+strength :: Ord a
+         => Graph d a
+         -> VertexSelector a
+         -> Bool -- ^ count self-loops?
+         -> Map a Int
+strength g vs b = unsafePerformIO $ do
+  v  <- newVector 0
+  _e <- withGraph g $ \gp ->
+        withVector v $ \vp ->
+        withVs vs g $ \vsp ->
+        withOptionalWeights g $ \wp ->
+          c_igraph_strength
+            gp
+            vp
+            vsp
+            (getNeiMode g)
+            b
+            wp
+  scores <- vectorToList v
+  return $ M.fromList $ zip (selectedVertices g vs) (map round scores)
+
+{-
 5.11. igraph_eigenvector_centrality — Eigenvector centrality of the vertices
 
   int igraph_eigenvector_centrality(const igraph_t *graph, 
@@ -1001,7 +1133,14 @@ closeness g vs = unsafePerformIO $ do
                                     igraph_bool_t directed, igraph_bool_t scale,
                                     const igraph_vector_t *weights,
                                     igraph_arpack_options_t *options);
+  TODO: -}
 
+--foreign import ccall "igraph_eigenvector_centrality"
+--  c_igraph_eigenvector_centrality :: GraphPtr -> VectorPtr -> Ptr Double
+--                                  -> Bool -> Bool -> VectorPtr -> Ptr ?
+--                                  -> IO CInt
+
+{-
 5.12. igraph_hub_score — Kleinberg's hub scores
 
   int igraph_hub_score(const igraph_t *graph, igraph_vector_t *vector,
