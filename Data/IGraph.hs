@@ -43,7 +43,7 @@ module Data.IGraph
   , getAllShortestPaths, getAllShortestPathsDijkstra
   , averagePathLength
   , pathLengthHist
-  , diameter, diameter', diameter''
+  , diameter, diameter', diameter'', diameterDijkstra
   , girth, girth'
   , eccentricity
   , radius
@@ -97,7 +97,6 @@ import System.IO.Unsafe (unsafePerformIO)
 
 {- nothing here -}
 
-
 --------------------------------------------------------------------------------
 -- 11.3. Generic vertex selector operations
 
@@ -133,6 +132,7 @@ selectedVertices g vs = unsafePerformIO $ do
 foreign import ccall "igraph_are_connected"
   c_igraph_are_connected :: GraphPtr -> CInt -> CInt -> Ptr CInt -> IO CInt
 
+-- | 1\.1\. igraph_are_connected — Decides whether two vertices are connected
 areConnected :: Graph d a -> a -> a -> Bool
 areConnected g n1 n2 = case (nodeToId g n1, nodeToId g n2) of
   (Just i1, Just i2) -> unsafePerformIO $ withGraph g $ \gp -> alloca $ \bp -> do
@@ -146,6 +146,8 @@ areConnected g n1 n2 = case (nodeToId g n1, nodeToId g n2) of
 foreign import ccall "shortest_paths"
   c_igraph_shortest_paths :: GraphPtr -> MatrixPtr -> VsPtr -> VsPtr -> CInt -> IO CInt
 
+-- | 2\.1\. igraph_shortest_paths — The length of the shortest paths between
+-- vertices.
 shortestPaths :: (Ord a, Hashable a)
               => Graph d a
               -> VertexSelector a
@@ -175,16 +177,12 @@ shortestPaths g vf vt =
 roundMaybe :: Double -> Maybe Int
 roundMaybe d = if d == 1/0 then Nothing else Just (round d)
 
-{-- TODO:
-
-2.2. igraph_shortest_paths_dijkstra — Weighted shortest paths from some sources.
-
-  DONE: -}
-
 foreign import ccall "shortest_paths_dijkstra"
   c_igraph_shortest_paths_dijkstra :: GraphPtr -> MatrixPtr -> VsPtr -> VsPtr
                                    -> VectorPtr -> CInt -> IO CInt
 
+-- | 2\.2\. igraph_shortest_paths_dijkstra — Weighted shortest paths from some
+-- sources.
 shortestPathsDijkstra :: (Ord a, Hashable a)
                       => Graph (Weighted d) a
                       -> VertexSelector a
@@ -213,15 +211,12 @@ shortestPathsDijkstra g vf vt =
                  , (t,len) <- zip nt (map roundMaybe lf)
                  ]
 
-{-
-2.3. igraph_shortest_paths_bellman_ford — Weighted shortest paths from some sources allowing negative weights.
-
- DONE: -}
-
 foreign import ccall "shortest_paths_bellman_ford"
   c_igraph_shortest_paths_bellman_ford :: GraphPtr -> MatrixPtr -> VsPtr -> VsPtr -> VectorPtr
                                        -> CInt -> IO CInt
 
+-- | 2\.3\. igraph_shortest_paths_bellman_ford — Weighted shortest paths from some
+-- sources allowing negative weights.
 shortestPathsBellmanFord :: (Ord a, Hashable a)
                          => Graph (Weighted d) a
                          -> VertexSelector a
@@ -250,15 +245,12 @@ shortestPathsBellmanFord g vf vt =
                  , (t,len) <- zip nt (map roundMaybe lf)
                  ]
 
-{-
-2.4. igraph_shortest_paths_johnson — Calculate shortest paths from some sources using Johnson's algorithm.
-
-  DONE: -}
-
 foreign import ccall "shortest_paths_johnson"
   c_igraph_shortest_paths_johnson :: GraphPtr -> MatrixPtr -> VsPtr -> VsPtr -> VectorPtr
                                   -> IO CInt
 
+-- | 2\.4\. igraph_shortest_paths_johnson — Calculate shortest paths from some
+-- sources using Johnson's algorithm.
 shortestPathsJohnson :: (Ord a, Hashable a)
                      => Graph (Weighted d) a
                      -> VertexSelector a
@@ -286,15 +278,11 @@ shortestPathsJohnson g vf vt =
                  , (t,len) <- zip nt (map roundMaybe lf)
                  ]
 
-{-
-2.5. igraph_get_shortest_paths — Calculates the shortest paths from/to one vertex.
-
-  DONE: -}
-
 foreign import ccall "get_shortest_paths"
   c_igraph_get_shortest_paths :: GraphPtr -> VectorPtrPtr -> VectorPtrPtr -> CInt -> VsPtr -> CInt -> IO CInt
 
--- | This doesn't work? TODO
+-- | 2\.5\. igraph_get_shortest_paths — Calculates the shortest paths from/to one
+-- vertex.
 getShortestPaths :: Graph d a
                  -> a                     -- ^ from
                  -> VertexSelector a      -- ^ to
@@ -321,15 +309,11 @@ getShortestPaths g f vt =
              e <- vectorPtrToEdges    g vpe
              return $ zip v e
 
-{-
-
-2.6. igraph_get_shortest_path — Shortest path from one vertex to another one.
-
-  DONE: -}
-
 foreign import ccall "igraph_get_shortest_path"
   c_igraph_get_shortest_path :: GraphPtr -> VectorPtr -> VectorPtr -> CInt -> CInt -> CInt -> IO CInt
 
+-- | 2\.6\. igraph_get_shortest_path — Shortest path from one vertex to another
+-- one.
 getShortestPath :: Graph d a -> a -> a -> ([a],[Edge d a])
 getShortestPath g n1 n2 =
   let mi1 = nodeToId g n1
@@ -355,17 +339,12 @@ getShortestPath g n1 n2 =
                    error $ "getShortestPath: igraph error " ++ show e
            _ -> error "getShortestPath: Invalid nodes"
 
-{-
-
-2.7. igraph_get_shortest_paths_dijkstra — Calculates the weighted shortest paths from/to one vertex.
-
-  DONE: -}
-
 foreign import ccall "get_shortest_paths_dijkstra"
   c_igraph_get_shortest_paths_dijkstra :: GraphPtr -> VectorPtrPtr -> VectorPtrPtr
                                        -> CInt -> VsPtr -> VectorPtr -> CInt -> IO CInt
 
--- | This doesn't work? TODO
+-- | 2\.7\. igraph_get_shortest_paths_dijkstra — Calculates the weighted
+-- shortest paths from/to one vertex.
 getShortestPathsDijkstra :: Graph (Weighted d) a
                          -> a                     -- ^ from
                          -> VertexSelector a      -- ^ to
@@ -394,15 +373,12 @@ getShortestPathsDijkstra g f vt =
              e <- vectorPtrToEdges    g vpe
              return $ zip v e
 
-{-
-2.8. igraph_get_shortest_path_dijkstra — Weighted shortest path from one vertex to another one.
-
-  DONE: -}
-
 foreign import ccall "igraph_get_shortest_path_dijkstra"
   c_igraph_get_shortest_path_dijkstra :: GraphPtr -> VectorPtr -> VectorPtr -> CInt
                                       -> CInt -> VectorPtr -> CInt -> IO CInt
 
+-- | 2\.8\. igraph_get_shortest_path_dijkstra — Weighted shortest path from one
+-- vertex to another one.
 getShortestPathDijkstra :: Graph (Weighted d) a -> a -> a -> ([a],[Edge (Weighted d) a])
 getShortestPathDijkstra g n1 n2 =
   let mi1 = nodeToId g n1
@@ -431,11 +407,6 @@ getShortestPathDijkstra g n1 n2 =
                 error $ "getShortestPathDijkstra: igraph error " ++ show e
            _ -> error "getShortestPathDijkstra: Invalid nodes"
 
-{-
-2.9. igraph_get_all_shortest_paths — Finds all shortest paths (geodesics) from a vertex to all other vertices.
-
-  DONE: -}
-
 foreign import ccall "get_all_shortest_paths"
   c_igraph_get_all_shortest_paths :: GraphPtr
                                   -> VectorPtrPtr
@@ -445,6 +416,8 @@ foreign import ccall "get_all_shortest_paths"
                                   -> CInt
                                   -> IO CInt
 
+-- | 2\.9\. igraph_get_all_shortest_paths — Finds all shortest paths (geodesics)
+-- from a vertex to all other vertices.
 getAllShortestPaths :: Graph d a
                     -> a                  -- ^ from
                     -> VertexSelector a   -- ^ to
@@ -468,12 +441,6 @@ getAllShortestPaths g f vt =
                           (getNeiMode g)
              vectorPtrToVertices g vpr
 
-{-
-
-2.10. igraph_get_all_shortest_paths_dijkstra — Finds all shortest paths (geodesics) from a vertex to all other vertices.
-
-  DONE: -}
-
 foreign import ccall "get_all_shortest_paths_dijkstra"
   c_igraph_get_all_shortest_paths_dijkstra :: GraphPtr
                                            -> VectorPtrPtr
@@ -484,6 +451,8 @@ foreign import ccall "get_all_shortest_paths_dijkstra"
                                            -> CInt
                                            -> IO CInt
 
+-- | 2\.10\. igraph_get_all_shortest_paths_dijkstra — Finds all shortest paths
+-- (geodesics) from a vertex to all other vertices.
 getAllShortestPathsDijkstra :: Graph (Weighted d) a
                             -> a                  -- ^ from
                             -> VertexSelector a   -- ^ to
@@ -509,14 +478,11 @@ getAllShortestPathsDijkstra g f vt =
                         (getNeiMode g)
              vectorPtrToVertices g vpr
 
-{-
-2.11. igraph_average_path_length — Calculates the average geodesic length in a graph.
-
-  DONE: -}
-
 foreign import ccall "igraph_average_path_length"
   c_igraph_average_path_length :: GraphPtr -> Ptr CDouble -> Bool -> Bool -> IO CInt
 
+-- | 2\.11\. igraph_average_path_length — Calculates the average geodesic length
+-- in a graph.
 averagePathLength :: Graph d a
                   -> Bool     -- ^ Boolean, whether to consider directed paths. Ignored for undirected graphs.
                   -> Bool     -- ^ What to do if the graph is not connected. If
@@ -537,15 +503,10 @@ averagePathLength g b1 b2 = unsafePerformIO $ do
               b2
     realToFrac `fmap` peek dp
 
-{-
-
-2.12. igraph_path_length_hist — Create a histogram of all shortest path lengths.
-
-  DONE: -}
-
 foreign import ccall "igraph_path_length_hist"
   c_igraph_path_length_hist :: GraphPtr -> VectorPtr -> Ptr CDouble -> Bool -> IO CInt
 
+-- | 2\.12\. igraph_path_length_hist — Create a histogram of all shortest path lengths.
 pathLengthHist :: Graph d a
                -> Bool  -- ^ Whether to consider directed paths in a directed
                        -- graph (if not zero). This argument is ignored for
@@ -565,12 +526,6 @@ pathLengthHist g b = unsafePerformIO $ do
   l <- vectorToList v
   return (l,d)
 
-{-
-
-2.13. igraph_diameter — Calculates the diameter of a graph (longest geodesic).
-
-  DONE: -}
-
 foreign import ccall "igraph_diameter"
   c_igraph_diameter :: GraphPtr
                     -> Ptr CInt
@@ -581,6 +536,8 @@ foreign import ccall "igraph_diameter"
                     -> Bool
                     -> IO CInt
 
+-- | 2\.13\. igraph_diameter — Calculates the diameter of a graph (longest
+-- geodesic).
 diameter :: Graph d a
          -> Bool -- ^ directed?
          -> Bool -- ^ unconnected?
@@ -641,26 +598,44 @@ diameter'' g b1 b2 = unsafePerformIO $ do
     p <- vectorToVertices g v
     return (d,p)
 
-{-
+foreign import ccall "igraph_diameter_dijkstra"
+  c_igraph_diameter_dijkstra
+    :: GraphPtr -> VectorPtr -> Ptr CDouble -> Ptr CInt -> Ptr CInt -> VectorPtr
+    -> Bool -> Bool -> IO CInt
 
-2.14. igraph_diameter_dijkstra — Weighted diameter using Dijkstra's algorithm, non-negative weights only.
-
-  int igraph_diameter_dijkstra(const igraph_t *graph,
-                               const igraph_vector_t *weights,
-                               igraph_real_t *pres,
-                               igraph_integer_t *pfrom,
-                               igraph_integer_t *pto,
-                               igraph_vector_t *path,
-                               igraph_bool_t directed,
-                               igraph_bool_t unconn);
-
-2.15. igraph_girth — The girth of a graph is the length of the shortest circle in it.
-
-  DONE: -}
+-- | 2\.14\. igraph_diameter_dijkstra — Weighted diameter using Dijkstra's
+-- algorithm, non-negative weights only.
+diameterDijkstra :: Graph d a
+                 -> (Double, a, a, [a]) -- ^ (diameter, source vertex, target vertex, path)
+diameterDijkstra g@(G _) = unsafePerformIO $
+  alloca $ \dp -> alloca $ \sp -> alloca $ \tp -> do
+    v  <- newVector 0
+    _e <- withGraph g $ \gp ->
+          withOptionalWeights g $ \wp ->
+          withVector v $ \vp ->
+            c_igraph_diameter_dijkstra
+              gp
+              wp
+              dp
+              sp
+              tp
+              vp
+              (isDirected g)
+              True
+    d <- peek dp
+    s <- peek sp
+    t <- peek tp
+    path <- vectorToVertices g v
+    return ( realToFrac d
+           , idToNode'' g (fromIntegral s)
+           , idToNode'' g (fromIntegral t)
+           , path )
 
 foreign import ccall "igraph_girth"
   c_igraph_girth :: GraphPtr -> Ptr CInt -> VectorPtr -> IO CInt
 
+-- | 2\.15\. igraph_girth — The girth of a graph is the length of the shortest
+-- circle in it.
 girth :: Graph d a -> Int
 girth g = unsafePerformIO $ do
   alloca $ \ip -> do
@@ -686,15 +661,10 @@ girth' g = unsafePerformIO $ do
     s  <- vectorToVertices g v
     return (gr, s)
 
-{-
-
-2.16. igraph_eccentricity — Eccentricity of some vertices
-
-  DONE: -}
-
 foreign import ccall "eccentricity"
   c_igraph_eccentricity :: GraphPtr -> VectorPtr -> VsPtr -> CInt -> IO CInt
 
+-- | 2\.16\. igraph_eccentricity — Eccentricity of some vertices
 eccentricity :: Graph d a -> VertexSelector a -> [(a,Int)]
 eccentricity g vs = unsafePerformIO $ do
   v  <- newVector 0
@@ -709,16 +679,10 @@ eccentricity g vs = unsafePerformIO $ do
   l <- map round `fmap` vectorToList v
   return $ zip (selectedVertices g vs) l
 
-
-{-
-
-2.17. igraph_radius — Radius of a graph
-
-  DONE: -}
-
 foreign import ccall "igraph_radius"
   c_igraph_radius :: GraphPtr -> Ptr CDouble -> CInt -> IO CInt
 
+-- | 2\.17\. igraph_radius — Radius of a graph
 radius :: Graph d a -> Int
 radius g = unsafePerformIO $ do
   alloca $ \dp -> do
@@ -737,8 +701,10 @@ radius g = unsafePerformIO $ do
 
 3.1. igraph_neighborhood_size — Calculates the size of the neighborhood of a given vertex.
 
-  int igraph_neighborhood_size(const igraph_t *graph, igraph_vector_t *res,
-                               igraph_vs_t vids, igraph_integer_t order,
+  int igraph_neighborhood_size(const igraph_t *graph,
+                               igraph_vector_t *res,
+                               igraph_vs_t vids,
+                               igraph_integer_t order,
                                igraph_neimode_t mode);
 
 3.2. igraph_neighborhood — Calculate the neighborhood of vertices.
@@ -776,15 +742,10 @@ neighborhood vs o = runUnsafeIO $ \g -> do
 --------------------------------------------------------------------------------
 -- 13.4 Graph Components
 
-{- TODO
-
-4.1. igraph_subcomponent — The vertices in the same component as a given vertex.
-
-  DONE: -}
-
 foreign import ccall "igraph_subcomponent"
   c_igraph_subcomponent :: GraphPtr -> VectorPtr -> CDouble -> CInt -> IO CInt
 
+-- | 4\.1\. igraph_subcomponent — The vertices in the same component as a given vertex.
 subcomponent :: Graph d a -> a -> [a]
 subcomponent g a = case nodeToId g a of
   Just i -> unsafePerformIO $ do
@@ -841,20 +802,17 @@ subgraph vs = do
 -}
 
 {-
-
 4.5. igraph_clusters — Calculates the (weakly or strongly) connected components in a graph.
 
   int igraph_clusters(const igraph_t *graph, igraph_vector_t *membership, 
                       igraph_vector_t *csize, igraph_integer_t *no,
                       igraph_connectedness_t mode);
-
-4.6. igraph_is_connected — Decides whether the graph is (weakly or strongly) connected.
-
-  DONE: -}
+-}
 
 foreign import ccall "igraph_is_connected"
   c_igraph_is_connected :: GraphPtr -> Ptr CInt -> CInt -> IO CInt
 
+-- | 4\.6\. igraph_is_connected — Decides whether the graph is (weakly or strongly) connected.
 isConnected :: Graph d a -> Connectedness -> Bool
 isConnected g c = unsafePerformIO $ withGraph g $ \gp -> alloca $ \b -> do
   _ <- c_igraph_is_connected gp b (fromIntegral $ fromEnum c)
@@ -895,17 +853,13 @@ necessary? no.
                                     igraph_vector_ptr_t *component_edges,
                                     igraph_vector_ptr_t *components,
                                     igraph_vector_t *articulation_points);
-
-4.10. igraph_articulation_points — Find the articulation points in a graph.
-
-  int igraph_articulation_points(const igraph_t *graph,
-                                 igraph_vector_t *res);
-
-  DONE: -}
+-}
 
 foreign import ccall "igraph_articulation_points"
   c_igraph_articulation_points :: GraphPtr -> VectorPtr -> IO CInt
 
+-- | 4\.10\. igraph_articulation_points — Find the articulation points in a
+-- graph.
 articulationPoints :: Graph d a -> [a]
 articulationPoints g = unsafePerformIO $ do
   v  <- newVector 0
@@ -920,19 +874,11 @@ articulationPoints g = unsafePerformIO $ do
 --------------------------------------------------------------------------------
 -- 13.5 Centrality Measures
 
-{- TODO:
-
-5.1. igraph_closeness — Closeness centrality calculations for some vertices.
-
-  int igraph_closeness(const igraph_t *graph, igraph_vector_t *res,
-                       const igraph_vs_t vids, igraph_neimode_t mode, 
-                       const igraph_vector_t *weights);
-
-  DONE: -}
-
 foreign import ccall "closeness"
   c_igraph_closeness :: GraphPtr -> VectorPtr -> VsPtr -> CInt -> VectorPtr -> IO CInt
 
+-- | 5\.1\. igraph_closeness — Closeness centrality calculations for some
+-- vertices.
 closeness :: Ord a => Graph d a -> VertexSelector a -> Map a Double
 closeness g vs = unsafePerformIO $ do
   v  <- newVector 0
@@ -949,22 +895,10 @@ closeness g vs = unsafePerformIO $ do
   scores <- vectorToList v
   return $ M.fromList $ zip (selectedVertices g vs) scores
 
-{-
-
-5.2. igraph_betweenness — Betweenness centrality of some vertices.
-
-  int igraph_betweenness(const igraph_t *graph,
-                         igraph_vector_t *res,
-                         const igraph_vs_t vids,
-                         igraph_bool_t directed, 
-                         const igraph_vector_t* weights,
-                         igraph_bool_t nobigint);
-
-  DONE: -}
-
 foreign import ccall "betweenness"
   c_igraph_betweenness :: GraphPtr -> VectorPtr -> VsPtr -> Bool -> VectorPtr -> Bool -> IO CInt
 
+-- | 5\.2\. igraph_betweenness — Betweenness centrality of some vertices.
 betweenness :: Ord a => Graph d a -> VertexSelector a -> Map a Double
 betweenness g vs = unsafePerformIO $ do
   v  <- newVector 0
@@ -982,18 +916,10 @@ betweenness g vs = unsafePerformIO $ do
   scores <- vectorToList v
   return $ M.fromList $ zip (selectedVertices g vs) scores
 
-{-
-5.3. igraph_edge_betweenness — Betweenness centrality of the edges.
-
-  int igraph_edge_betweenness(const igraph_t *graph, igraph_vector_t *result,
-                              igraph_bool_t directed, 
-                              const igraph_vector_t *weights);
-
-  DONE: -}
-
 foreign import ccall "igraph_edge_betweenness"
   c_igraph_edge_betweenness :: GraphPtr -> VectorPtr -> Bool -> VectorPtr -> IO CInt
 
+-- | 5\.3\. igraph_edge_betweenness — Betweenness centrality of the edges.
 edgeBetweenness :: Ord (Edge d a) => Graph d a -> Map (Edge d a) Double
 edgeBetweenness g = unsafePerformIO $ do
   v  <- newVector 0
@@ -1044,19 +970,12 @@ edgeBetweenness g = unsafePerformIO $ do
                                       igraph_vs_t reset_vids,
                                       const igraph_vector_t *weights,
                                       igraph_arpack_options_t *options);
-
-5.8. igraph_constraint — Burt's constraint scores.
-
-  int igraph_constraint(const igraph_t *graph,
-                        igraph_vector_t *res,
-                        igraph_vs_t vids,
-                        const igraph_vector_t *weights);
-
-  DONE: -}
+-}
 
 foreign import ccall "constraint"
   c_igraph_constraint :: GraphPtr -> VectorPtr -> VsPtr -> VectorPtr -> IO CInt
 
+-- | 5\.8\. igraph_constraint — Burt's constraint scores.
 constraint :: Ord a => Graph d a -> VertexSelector a -> Map a Double
 constraint g vs = unsafePerformIO $ do
   v  <- newVector 0
@@ -1072,21 +991,11 @@ constraint g vs = unsafePerformIO $ do
   scores <- vectorToList v
   return $ M.fromList $ zip (selectedVertices g vs) scores
 
-{-
-5.9. igraph_maxdegree — Calculate the maximum degree in a graph (or set of vertices).
-
-  int igraph_maxdegree(const igraph_t *graph,
-                       igraph_integer_t *res,
-                       igraph_vs_t vids,
-                       igraph_neimode_t mode, 
-                       igraph_bool_t loops);
-
-  DONE: -}
-
 foreign import ccall "maxdegree"
   c_igraph_maxdegree :: GraphPtr -> Ptr CInt -> VsPtr -> CInt -> Bool -> IO CInt
 
--- | TODO: Result is wrong
+-- | 5\.9\. igraph_maxdegree — Calculate the maximum degree in a graph (or set
+-- of vertices).
 maxdegree :: Graph d a
           -> VertexSelector a
           -> Bool -- ^ count self-loops?
@@ -1103,17 +1012,11 @@ maxdegree g vs b = unsafePerformIO $
             b
     fromIntegral `fmap` peek ip
 
-{-
-5.10. igraph_strength — Strength of the vertices, weighted vertex degree in other words.
-
-  int igraph_strength(const igraph_t *graph, igraph_vector_t *res,
-                      const igraph_vs_t vids, igraph_neimode_t mode,
-                      igraph_bool_t loops, const igraph_vector_t *weights);
-  DONE: -}
-
 foreign import ccall "strength"
   c_igraph_strength :: GraphPtr -> VectorPtr -> VsPtr -> CInt -> Bool -> VectorPtr -> IO CInt
 
+-- | 5\.10\. igraph_strength — Strength of the vertices, weighted vertex degree
+-- in other words.
 strength :: Ord a
          => Graph d a
          -> VertexSelector a
@@ -1144,14 +1047,7 @@ strength g vs b = unsafePerformIO $ do
                                     igraph_bool_t directed, igraph_bool_t scale,
                                     const igraph_vector_t *weights,
                                     igraph_arpack_options_t *options);
-  TODO: -}
 
---foreign import ccall "igraph_eigenvector_centrality"
---  c_igraph_eigenvector_centrality :: GraphPtr -> VectorPtr -> Ptr Double
---                                  -> Bool -> Bool -> VectorPtr -> Ptr ?
---                                  -> IO CInt
-
-{-
 5.12. igraph_hub_score — Kleinberg's hub scores
 
   int igraph_hub_score(const igraph_t *graph, igraph_vector_t *vector,
@@ -1171,22 +1067,11 @@ strength g vs b = unsafePerformIO $ do
 --------------------------------------------------------------------------------
 -- 13.6 Estimating Centrality Measures
 
-{- TODO:
-
-6.1. igraph_closeness_estimate — Closeness centrality estimations for some vertices.
-
-  int igraph_closeness_estimate(const igraph_t *graph,
-                                igraph_vector_t *res, 
-                                const igraph_vs_t vids,
-                                igraph_neimode_t mode,
-                                igraph_real_t cutoff,
-                                const igraph_vector_t *weights);
-
-  DONE: -}
-
 foreign import ccall "closeness_estimate"
   c_igraph_closeness_estimate :: GraphPtr -> VectorPtr -> VsPtr -> CInt -> CDouble -> VectorPtr -> IO CInt
 
+-- | 6\.1\. igraph_closeness_estimate — Closeness centrality estimations for
+-- some vertices.
 closenessEstimate :: Ord a => Graph d a
                   -> VertexSelector a
                   -> Int  -- ^ cutoff
@@ -1207,22 +1092,12 @@ closenessEstimate g vs cutoff = unsafePerformIO $ do
   scores <- vectorToList v
   return $ M.fromList $ zip (selectedVertices g vs) scores
 
-{-
-6.2. igraph_betweenness_estimate — Estimated betweenness centrality of some vertices.
-
-  int igraph_betweenness_estimate(const igraph_t *graph,
-                                  igraph_vector_t *res, 
-                                  const igraph_vs_t vids,
-                                  igraph_bool_t directed,
-                                  igraph_real_t cutoff, 
-                                  const igraph_vector_t *weights, 
-                                  igraph_bool_t nobigint);
-  DONE: -}
-
 foreign import ccall "betweenness_estimate"
   c_igraph_betweenness_estimate :: GraphPtr -> VectorPtr -> VsPtr -> Bool -> CDouble
                                 -> VectorPtr -> Bool -> IO CInt
 
+-- | 6\.2\. igraph_betweenness_estimate — Estimated betweenness centrality of
+-- some vertices.
 betweennessEstimate :: Ord a
                     => Graph d a
                     -> VertexSelector a
@@ -1245,19 +1120,11 @@ betweennessEstimate g@(G _) vs cutoff = unsafePerformIO $ do
   scores <- vectorToList v
   return $ M.fromList $ zip (selectedVertices g vs) scores
 
-{-
-6.3. igraph_edge_betweenness_estimate — Estimated betweenness centrality of the edges.
-
-  int igraph_edge_betweenness_estimate(const igraph_t *graph,
-                                       igraph_vector_t *result,
-                                       igraph_bool_t directed,
-                                       igraph_real_t cutoff,
-                                       const igraph_vector_t *weights);
-  DONE: -}
-
 foreign import ccall "igraph_edge_betweenness_estimate"
   c_igraph_edge_betweenness_estimate :: GraphPtr -> VectorPtr -> Bool -> CDouble -> VectorPtr -> IO CInt
 
+-- | 6\.3\. igraph_edge_betweenness_estimate — Estimated betweenness centrality
+-- of the edges.
 edgeBetweennessEstimate :: Ord (Edge d a)
                         => Graph d a
                         -> Int -- ^ cutoff
@@ -1279,29 +1146,20 @@ edgeBetweennessEstimate g@(G _) cutoff = unsafePerformIO $ do
 --------------------------------------------------------------------------------
 -- 13.7 Centralization
 
-{- TODO:
-
+{-
 7.1. igraph_centralization — Calculate the centralization score from the node level scores
 
   igraph_real_t igraph_centralization(const igraph_vector_t *scores,
                                       igraph_real_t theoretical_max,
                                       igraph_bool_t normalized);
-
-7.2. igraph_centralization_degree — Calculate vertex degree and graph centralization
-
-  int igraph_centralization_degree(const igraph_t *graph,
-                                   igraph_vector_t *res, 
-                                   igraph_neimode_t mode, igraph_bool_t loops,
-                                   igraph_real_t *centralization,
-                                   igraph_real_t *theoretical_max,
-                                   igraph_bool_t normalized);
-
-  DONE: -}
+-}
 
 foreign import ccall "igraph_centralization_degree"
   c_igraph_centralization_degree :: GraphPtr -> VectorPtr -> CInt -> Bool
                                  -> Ptr CDouble -> Ptr CDouble -> Bool -> IO CInt
 
+-- | 7\.2\. igraph_centralization_degree — Calculate vertex degree and graph
+-- centralization
 centralizationDegree :: Ord a => Graph d a
                      -> Bool -- ^ consider loop edges?
                      -> Bool -- ^ normalize centralization score?
@@ -1327,23 +1185,12 @@ centralizationDegree g l n = unsafePerformIO $ do
              , realToFrac c
              , realToFrac t )
 
-{-
-7.3. igraph_centralization_betweenness — Calculate vertex betweenness and graph centralization
-
-  int igraph_centralization_betweenness(const igraph_t *graph, 
-                                        igraph_vector_t *res,
-                                        igraph_bool_t directed,
-                                        igraph_bool_t nobigint,
-                                        igraph_real_t *centralization,
-                                        igraph_real_t *theoretical_max,
-                                        igraph_bool_t normalized);
-
-  DONE: -}
-
 foreign import ccall "igraph_centralization_betweenness"
   c_igraph_centralization_betweenness :: GraphPtr -> VectorPtr -> Bool -> Bool
                                       -> Ptr CDouble -> Ptr CDouble -> Bool -> IO CInt
 
+-- | 7\.3\. igraph_centralization_betweenness — Calculate vertex betweenness and
+-- graph centralization
 centralizationBetweenness :: Ord a => Graph d a
                           -> Bool -- ^ normalize centralization score?
                           -> (Map a Double, Double, Double) -- ^ (node-level degree scores, centralization scores, theoretical max)
@@ -1367,22 +1214,12 @@ centralizationBetweenness g@(G _) n = unsafePerformIO $
            , realToFrac c
            , realToFrac t )
 
-
-{-
-7.4. igraph_centralization_closeness — Calculate vertex closeness and graph centralization
-
-  int igraph_centralization_closeness(const igraph_t *graph, 
-                                      igraph_vector_t *res, 
-                                      igraph_neimode_t mode, 
-                                      igraph_real_t *centralization,
-                                      igraph_real_t *theoretical_max,
-                                      igraph_bool_t normalized);
-  DONE: -}
-
 foreign import ccall "igraph_centralization_closeness"
   c_igraph_centralization_closeness
     :: GraphPtr -> VectorPtr -> CInt -> Ptr CDouble -> Ptr CDouble -> Bool -> IO CInt
 
+-- | 7\.4\. igraph_centralization_closeness — Calculate vertex closeness and
+-- graph centralization
 centralizationCloseness :: Ord a => Graph d a
                         -> Bool -- ^ normalize centralization score?
                         -> (Map a Double, Double, Double) -- ^ (node-level degree scores, centralization scores, theoretical max)
@@ -1417,21 +1254,14 @@ centralizationCloseness g n = unsafePerformIO $
                                                    igraph_real_t *centralization,
                                                    igraph_real_t *theoretical_max,
                                                    igraph_bool_t normalized);
-
-7.6. igraph_centralization_degree_tmax — Theoretical maximum for graph centralization based on degree
-
-  int igraph_centralization_degree_tmax(const igraph_t *graph, 
-                                        igraph_integer_t nodes,
-                                        igraph_neimode_t mode,
-                                        igraph_bool_t loops,
-                                        igraph_real_t *res);
-
-  DONE: -}
+-}
 
 foreign import ccall "igraph_centralization_degree_tmax"
   c_igraph_centralization_degree_tmax
     :: GraphPtr -> CInt -> CInt -> Bool -> Ptr CDouble -> IO CInt
 
+-- | 7\.6\. igraph_centralization_degree_tmax — Theoretical maximum for graph
+-- centralization based on degree
 centralizationDegreeTMax :: Either (Graph d a) Int -- ^ either graph or number of nodes
                          -> Bool -- ^ consider loop edges?
                          -> Double
@@ -1452,20 +1282,12 @@ centralizationDegreeTMax egi b = unsafePerformIO $
   i       = either (const 0) fromIntegral egi
   neimode = either getNeiMode (const (fromIntegral (fromEnum Out))) egi
 
-{-
-7.7. igraph_centralization_betweenness_tmax — Theoretical maximum for graph centralization based on betweenness
-
-  int igraph_centralization_betweenness_tmax(const igraph_t *graph, 
-                                             igraph_integer_t nodes,
-                                             igraph_bool_t directed,
-                                             igraph_real_t *res);
-
-  DONE: -}
-
 foreign import ccall "igraph_centralization_betweenness_tmax"
   c_igraph_centralization_betweenness_tmax
     :: GraphPtr -> CInt -> Bool -> Ptr CDouble -> IO CInt
 
+-- | 7\.7\. igraph_centralization_betweenness_tmax — Theoretical maximum for
+-- graph centralization based on betweenness
 centralizationBetweennessTMax :: Either (Graph d a) Int
                               -> Double
 centralizationBetweennessTMax egi = unsafePerformIO $
@@ -1484,20 +1306,12 @@ centralizationBetweennessTMax egi = unsafePerformIO $
   i        = either (const 0) fromIntegral egi
   directed = either (\g@(G _) -> isDirected g) (const True) egi
 
-{-
-7.8. igraph_centralization_closeness_tmax — Theoretical maximum for graph centralization based on closeness
-
-  int igraph_centralization_closeness_tmax(const igraph_t *graph,
-                                           igraph_integer_t nodes,
-                                           igraph_neimode_t mode,
-                                           igraph_real_t *res);
-
-  DONE: -}
-
 foreign import ccall "igraph_centralization_closeness_tmax"
   c_igraph_centralization_closeness_tmax
     :: GraphPtr -> CInt -> CInt -> Ptr CDouble -> IO CInt
 
+-- | 7\.8\. igraph_centralization_closeness_tmax — Theoretical maximum for graph
+-- centralization based on closeness
 centralizationClosenessTMax :: Either (Graph d a) Int -> Double
 centralizationClosenessTMax egi = unsafePerformIO $
   alloca $ \rp -> do
@@ -1523,7 +1337,6 @@ centralizationClosenessTMax egi = unsafePerformIO $
                                                         igraph_bool_t directed,
                                                         igraph_bool_t scale, 
                                                         igraph_real_t *res);
-
 -}
 
 --------------------------------------------------------------------------------
