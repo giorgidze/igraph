@@ -1342,6 +1342,53 @@ centralizationClosenessTMax egi = unsafePerformIO $
 --------------------------------------------------------------------------------
 -- 13.8 Similarity Measures
 
+{-
+8.1. igraph_bibcoupling — Bibliographic coupling.
+
+int igraph_bibcoupling(const igraph_t *graph, igraph_matrix_t *res, 
+                       const igraph_vs_t vids);
+
+8.2. igraph_cocitation — Cocitation coupling.
+
+int igraph_cocitation(const igraph_t *graph, igraph_matrix_t *res, 
+                      const igraph_vs_t vids);
+
+8.3. igraph_similarity_jaccard — Jaccard similarity coefficient for the given vertices.
+
+int igraph_similarity_jaccard(const igraph_t *graph, igraph_matrix_t *res,
+    const igraph_vs_t vids, igraph_neimode_t mode, igraph_bool_t loops);
+
+8.4. igraph_similarity_jaccard_pairs — Jaccard similarity coefficient for given vertex pairs.
+
+int igraph_similarity_jaccard_pairs(const igraph_t *graph, igraph_vector_t *res,
+  const igraph_vector_t *pairs, igraph_neimode_t mode, igraph_bool_t loops);
+
+8.5. igraph_similarity_jaccard_es — Jaccard similarity coefficient for a given edge selector.
+
+int igraph_similarity_jaccard_es(const igraph_t *graph, igraph_vector_t *res,
+  const igraph_es_t es, igraph_neimode_t mode, igraph_bool_t loops);
+
+8.6. igraph_similarity_dice — Dice similarity coefficient.
+
+int igraph_similarity_dice(const igraph_t *graph, igraph_matrix_t *res,
+    const igraph_vs_t vids, igraph_neimode_t mode, igraph_bool_t loops);
+
+8.7. igraph_similarity_dice_pairs — Dice similarity coefficient for given vertex pairs.
+
+int igraph_similarity_dice_pairs(const igraph_t *graph, igraph_vector_t *res,
+  const igraph_vector_t *pairs, igraph_neimode_t mode, igraph_bool_t loops);
+
+8.8. igraph_similarity_dice_es — Dice similarity coefficient for a given edge selector.
+
+int igraph_similarity_dice_es(const igraph_t *graph, igraph_vector_t *res,
+  const igraph_es_t es, igraph_neimode_t mode, igraph_bool_t loops);
+
+8.9. igraph_similarity_inverse_log_weighted — Vertex similarity based on the inverse logarithm of vertex degrees.
+
+int igraph_similarity_inverse_log_weighted(const igraph_t *graph,
+  igraph_matrix_t *res, const igraph_vs_t vids, igraph_neimode_t mode);
+-}
+
 --------------------------------------------------------------------------------
 -- 13.9 Spanning Trees
 
