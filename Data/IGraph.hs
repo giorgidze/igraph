@@ -68,6 +68,14 @@ module Data.IGraph
   , closenessEstimate
   , betweennessEstimate
   , edgeBetweennessEstimate
+
+    -- ** 13\.7 Centralization
+  , centralizationDegree
+  , centralizationBetweenness
+  , centralizationCloseness
+  , centralizationDegreeTMax
+  , centralizationBetweennessTMax
+  , centralizationClosenessTMax
   ) where
 
 import Data.IGraph.Internal
@@ -1288,6 +1296,38 @@ edgeBetweennessEstimate g@(G _) cutoff = unsafePerformIO $ do
                                    igraph_real_t *theoretical_max,
                                    igraph_bool_t normalized);
 
+  DONE: -}
+
+foreign import ccall "igraph_centralization_degree"
+  c_igraph_centralization_degree :: GraphPtr -> VectorPtr -> CInt -> Bool
+                                 -> Ptr CDouble -> Ptr CDouble -> Bool -> IO CInt
+
+centralizationDegree :: Ord a => Graph d a
+                     -> Bool -- ^ consider loop edges?
+                     -> Bool -- ^ normalize centralization score?
+                     -> (Map a Double, Double, Double) -- ^ (node-level degree scores, centralization scores, theoretical max)
+centralizationDegree g l n = unsafePerformIO $ do
+  v  <- newVector 0
+  alloca $ \cp ->
+    alloca $ \tp -> do
+      _e <- withGraph g $ \gp ->
+            withVector v $ \vp ->
+              c_igraph_centralization_degree
+                gp
+                vp
+                (getNeiMode g)
+                l
+                cp
+                tp
+                n
+      scores <- vectorToList v
+      c <- peek cp
+      t <- peek tp
+      return ( M.fromList (zip (F.toList (nodes g)) scores)
+             , realToFrac c
+             , realToFrac t )
+
+{-
 7.3. igraph_centralization_betweenness — Calculate vertex betweenness and graph centralization
 
   int igraph_centralization_betweenness(const igraph_t *graph, 
@@ -1298,6 +1338,37 @@ edgeBetweennessEstimate g@(G _) cutoff = unsafePerformIO $ do
                                         igraph_real_t *theoretical_max,
                                         igraph_bool_t normalized);
 
+  DONE: -}
+
+foreign import ccall "igraph_centralization_betweenness"
+  c_igraph_centralization_betweenness :: GraphPtr -> VectorPtr -> Bool -> Bool
+                                      -> Ptr CDouble -> Ptr CDouble -> Bool -> IO CInt
+
+centralizationBetweenness :: Ord a => Graph d a
+                          -> Bool -- ^ normalize centralization score?
+                          -> (Map a Double, Double, Double) -- ^ (node-level degree scores, centralization scores, theoretical max)
+centralizationBetweenness g@(G _) n = unsafePerformIO $
+  alloca $ \cp -> alloca $ \tp -> do
+    v <- newVector 0
+    _e <- withGraph g $ \gp ->
+          withVector v $ \vp ->
+            c_igraph_centralization_betweenness
+              gp
+              vp
+              (isDirected g)
+              False
+              cp
+              tp
+              n
+    scores <- vectorToList v
+    c <- peek cp
+    t <- peek tp
+    return ( M.fromList (zip (F.toList (nodes g)) scores)
+           , realToFrac c
+           , realToFrac t )
+
+
+{-
 7.4. igraph_centralization_closeness — Calculate vertex closeness and graph centralization
 
   int igraph_centralization_closeness(const igraph_t *graph, 
@@ -1306,7 +1377,35 @@ edgeBetweennessEstimate g@(G _) cutoff = unsafePerformIO $ do
                                       igraph_real_t *centralization,
                                       igraph_real_t *theoretical_max,
                                       igraph_bool_t normalized);
+  DONE: -}
 
+foreign import ccall "igraph_centralization_closeness"
+  c_igraph_centralization_closeness
+    :: GraphPtr -> VectorPtr -> CInt -> Ptr CDouble -> Ptr CDouble -> Bool -> IO CInt
+
+centralizationCloseness :: Ord a => Graph d a
+                        -> Bool -- ^ normalize centralization score?
+                        -> (Map a Double, Double, Double) -- ^ (node-level degree scores, centralization scores, theoretical max)
+centralizationCloseness g n = unsafePerformIO $
+  alloca $ \cp -> alloca $ \tp -> do
+    v  <- newVector 0
+    _e <- withGraph g $ \gp ->
+          withVector v $ \vp ->
+            c_igraph_centralization_closeness
+              gp
+              vp
+              (getNeiMode g)
+              cp
+              tp
+              n
+    scores <- vectorToList v
+    c <- peek cp
+    t <- peek tp
+    return ( M.fromList (zip (F.toList (nodes g)) scores)
+           , realToFrac c
+           , realToFrac t )
+
+{-
 7.5. igraph_centralization_eigenvector_centrality — Calculate eigenvector centrality scores and graph centralization
 
   int igraph_centralization_eigenvector_centrality(const igraph_t *graph,
@@ -1327,6 +1426,33 @@ edgeBetweennessEstimate g@(G _) cutoff = unsafePerformIO $ do
                                         igraph_bool_t loops,
                                         igraph_real_t *res);
 
+  DONE: -}
+
+foreign import ccall "igraph_centralization_degree_tmax"
+  c_igraph_centralization_degree_tmax
+    :: GraphPtr -> CInt -> CInt -> Bool -> Ptr CDouble -> IO CInt
+
+centralizationDegreeTMax :: Either (Graph d a) Int -- ^ either graph or number of nodes
+                         -> Bool -- ^ consider loop edges?
+                         -> Double
+centralizationDegreeTMax egi b = unsafePerformIO $
+  alloca $ \rp -> do
+    _e <- withGraph' egi $ \gp ->
+            c_igraph_centralization_degree_tmax
+              gp
+              i
+              neimode
+              b
+              rp
+    r <- peek rp
+    return ( realToFrac r )
+ where
+  withGraph' (Left g)  = withGraph g
+  withGraph' (Right _) = (\f -> f nullPtr)
+  i       = either (const 0) fromIntegral egi
+  neimode = either getNeiMode (const (fromIntegral (fromEnum Out))) egi
+
+{-
 7.7. igraph_centralization_betweenness_tmax — Theoretical maximum for graph centralization based on betweenness
 
   int igraph_centralization_betweenness_tmax(const igraph_t *graph, 
@@ -1334,6 +1460,31 @@ edgeBetweennessEstimate g@(G _) cutoff = unsafePerformIO $ do
                                              igraph_bool_t directed,
                                              igraph_real_t *res);
 
+  DONE: -}
+
+foreign import ccall "igraph_centralization_betweenness_tmax"
+  c_igraph_centralization_betweenness_tmax
+    :: GraphPtr -> CInt -> Bool -> Ptr CDouble -> IO CInt
+
+centralizationBetweennessTMax :: Either (Graph d a) Int
+                              -> Double
+centralizationBetweennessTMax egi = unsafePerformIO $
+  alloca $ \rp -> do
+    _e <- withGraph' egi $ \gp ->
+            c_igraph_centralization_betweenness_tmax
+              gp
+              i
+              directed
+              rp
+    r <- peek rp
+    return ( realToFrac r )
+ where
+  withGraph' (Left g)  = withGraph g
+  withGraph' (Right _) = (\f -> f nullPtr)
+  i        = either (const 0) fromIntegral egi
+  directed = either (\g@(G _) -> isDirected g) (const True) egi
+
+{-
 7.8. igraph_centralization_closeness_tmax — Theoretical maximum for graph centralization based on closeness
 
   int igraph_centralization_closeness_tmax(const igraph_t *graph,
@@ -1341,6 +1492,30 @@ edgeBetweennessEstimate g@(G _) cutoff = unsafePerformIO $ do
                                            igraph_neimode_t mode,
                                            igraph_real_t *res);
 
+  DONE: -}
+
+foreign import ccall "igraph_centralization_closeness_tmax"
+  c_igraph_centralization_closeness_tmax
+    :: GraphPtr -> CInt -> CInt -> Ptr CDouble -> IO CInt
+
+centralizationClosenessTMax :: Either (Graph d a) Int -> Double
+centralizationClosenessTMax egi = unsafePerformIO $
+  alloca $ \rp -> do
+    _e <- withGraph' egi $ \gp ->
+            c_igraph_centralization_closeness_tmax
+              gp
+              i
+              neimode
+              rp
+    r <- peek rp
+    return ( realToFrac r )
+ where
+  withGraph' (Left g)  = withGraph g
+  withGraph' (Right _) = (\f -> f nullPtr)
+  i       = either (const 0) fromIntegral egi
+  neimode = either getNeiMode (const (fromIntegral (fromEnum Out))) egi
+
+{-
 7.9. igraph_centralization_eigenvector_centrality_tmax — Theoretical maximum centralization for eigenvector centrality
 
   int igraph_centralization_eigenvector_centrality_tmax(const igraph_t *graph,
