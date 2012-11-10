@@ -3,8 +3,8 @@
 module Data.IGraph.Internal where
 
 import qualified Data.HashMap.Strict as Map
-import Data.HashSet (HashSet)
 import qualified Data.HashSet as Set
+import qualified Data.Foldable as F
 
 import Control.Monad
 import Data.List
@@ -28,8 +28,8 @@ idToNode'' (G g) i = case Map.lookup i (graphIdToNode g) of
 
 edgeIdToEdge :: Graph d a -> Int -> Edge d a
 edgeIdToEdge g i
-  | i < 0 || i >= Set.size es = error ("edgeIdToEdge: Index " ++ show i ++ " out of bound.")
-  | otherwise                 = Set.toList es !! i
+  | i < 0 || i >= length es = error ("edgeIdToEdge: Index " ++ show i ++ " out of bound.")
+  | otherwise               = es !! i
  where
   es = edges g
 
@@ -61,7 +61,7 @@ setGraphPointer (G g) gp = do
 
 withWeights :: Graph (Weighted d) a -> (VectorPtr -> IO res) -> IO res
 withWeights g io = do
-  v <- listToVector $ map getWeight (Set.toList (edges g))
+  v <- listToVector $ map getWeight (edges g)
   withVector v io
 
 withOptionalWeights :: Graph d a -> (VectorPtr -> IO res) -> IO res
@@ -283,11 +283,11 @@ vectorPtrToList (VectorP fvp) = withForeignPtr fvp $ \vp -> do
 
 edgesToVector :: Graph d a -> IO Vector
 edgesToVector g@(G g') =
-  listToVector $ Set.foldr (\e r -> toId (edgeFrom e) : toId (edgeTo e) : r) [] (edges g)
+  listToVector $ foldr (\e r -> toId (edgeFrom e) : toId (edgeTo e) : r) [] (edges g)
  where
   toId n = case Map.lookup n (graphNodeToId g') of
-             Just i  -> i
-             Nothing -> error "edgesToVector: Graph node/ID mismatch."
+                Just i  -> i
+                Nothing -> error "edgesToVector: Graph node/ID mismatch."
 
 vectorToEdges :: Graph d a -> Vector -> IO [Edge d a]
 vectorToEdges g@(G _) v = do
@@ -399,7 +399,7 @@ deleteNode n (G g) = buildForeignGraph $ G $
 
 insertEdge :: Edge d a -> Graph d a -> Graph d a
 insertEdge e (G g)
-  | e `Set.member` edges (G g) || f == t = G g
+  | e `elem` edges (G g) || f == t = G g
   | otherwise = buildForeignGraph $ G $
     case (Map.member f (graphNodeToId g), Map.member t (graphNodeToId g)) of
          (True,  True)  -> insertEdge'' (G g)
@@ -431,23 +431,23 @@ deleteEdge e (G g)
  where
   (f,t) = (edgeFrom e, edgeTo e)
   deleteNodes g' =
-    let delF = if Set.null (neighbours f g') then deleteNode f else id
-        delT = if Set.null (neighbours t g') then deleteNode t else id
+    let delF = if null (neighbours f g') then deleteNode f else id
+        delT = if null (neighbours t g') then deleteNode t else id
      in delT . delF $ g'
 
-nodes :: Graph d a -> HashSet a
-nodes (G g) = Set.fromList $ Map.keys $ graphNodeToId g
+nodes :: Graph d a -> [a]
+nodes (G g) = Map.keys $ graphNodeToId g
 
-edges :: Graph d a -> HashSet (Edge d a)
-edges (G g) = graphEdges g
+edges :: Graph d a -> [Edge d a]
+edges (G g) = F.toList $ graphEdges g
 
-neighbours :: a -> Graph d a -> HashSet a
+neighbours :: a -> Graph d a -> [a]
 neighbours n g@(G _) =
-  Set.foldr neighbours'' Set.empty (edges g)
+  foldr neighbours'' [] (edges g)
  where
   neighbours'' e r
-    | edgeFrom e == n                       = Set.insert (edgeTo   e) r
-    | edgeTo   e == n && not (isDirected g) = Set.insert (edgeFrom e) r
+    | edgeFrom e == n                       = edgeTo   e : r
+    | edgeTo   e == n && not (isDirected g) = edgeFrom e : r
     | otherwise                             = r
 
 -- | Reverse a graph direction (Out -> In, In -> Out, other -> Out). O(1)
