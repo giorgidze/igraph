@@ -1351,16 +1351,15 @@ centralizationClosenessTMax egi = unsafePerformIO $
 --------------------------------------------------------------------------------
 -- 13.8 Similarity Measures
 
-{-
-8.1. igraph_bibcoupling — Bibliographic coupling.
-
-int igraph_bibcoupling(const igraph_t *graph, igraph_matrix_t *res, 
-                       const igraph_vs_t vids);
--}
-
 foreign import ccall "bibcoupling"
   c_igraph_bibcoupling :: GraphPtr -> MatrixPtr -> VsPtr -> IO CInt
 
+-- | 8\.1\. `igraph_bibcoupling` — Bibliographic coupling.
+--
+-- The bibliographic coupling of two vertices is the number of other vertices
+-- they both cite, `igraph_bibcoupling()` calculates this. The bibliographic
+-- coupling score for each given vertex and all other vertices in the graph will
+-- be calculated.
 bibCoupling :: Graph d a -> VertexSelector a -> [(a,[(a,Int)])]
 bibCoupling g vs = unsafePerformIO $ do
   let selected = selectedVertices g vs
@@ -1377,16 +1376,15 @@ bibCoupling g vs = unsafePerformIO $ do
   ids <- map (map round) `fmap` matrixToList m
   return $ zip selected (map (zip (nodes g)) ids)
 
-{-
-8.2. igraph_cocitation — Cocitation coupling.
-
-int igraph_cocitation(const igraph_t *graph, igraph_matrix_t *res, 
-                      const igraph_vs_t vids);
--}
-
 foreign import ccall "cocitation"
   c_igraph_cocitation :: GraphPtr -> MatrixPtr -> VsPtr -> IO CInt
 
+-- | 8\.2\. `igraph_cocitation` — Cocitation coupling.
+--
+-- Two vertices are cocited if there is another vertex citing both of them.
+-- `igraph_cocitation()` simply counts how many times two vertices are cocited.
+-- The cocitation score for each given vertex and all other vertices in the
+-- graph will be calculated.
 cocitation :: Graph d a -> VertexSelector a -> [(a,[(a,Int)])]
 cocitation g vs = unsafePerformIO $ do
   let selected = selectedVertices g vs
@@ -1403,16 +1401,16 @@ cocitation g vs = unsafePerformIO $ do
   ids <- map (map round) `fmap` matrixToList m
   return $ zip selected (map (zip (nodes g)) ids)
 
-{-
-8.3. igraph_similarity_jaccard — Jaccard similarity coefficient for the given vertices.
-
-int igraph_similarity_jaccard(const igraph_t *graph, igraph_matrix_t *res,
-    const igraph_vs_t vids, igraph_neimode_t mode, igraph_bool_t loops);
--}
-
 foreign import ccall "similarity_jaccard"
   c_igraph_similarity_jaccard :: GraphPtr -> MatrixPtr -> VsPtr -> CInt -> Bool -> IO CInt
 
+-- | 8\.3\. `igraph_similarity_jaccard` — Jaccard similarity coefficient for the
+-- given vertices.
+--
+-- The Jaccard similarity coefficient of two vertices is the number of common
+-- neighbors divided by the number of vertices that are neighbors of at least
+-- one of the two vertices being considered. This function calculates the
+-- pairwise Jaccard similarities for some (or all) of the vertices.
 similarityJaccard :: Graph d a
                   -> VertexSelector a
                   -> Bool -- ^ Whether to include the vertices themselves in the neighbor sets
@@ -1433,13 +1431,6 @@ similarityJaccard g vs loops = unsafePerformIO $ do
   ids <- matrixToList m
   return $ zip selected (map (zip selected) ids)
 
-{-
-8.4. igraph_similarity_jaccard_pairs — Jaccard similarity coefficient for given vertex pairs.
-
-int igraph_similarity_jaccard_pairs(const igraph_t *graph, igraph_vector_t *res,
-  const igraph_vector_t *pairs, igraph_neimode_t mode, igraph_bool_t loops);
--}
-
 foreign import ccall "similarity_jaccard_pairs"
   c_igraph_similarity_jaccard_pairs
     :: GraphPtr
@@ -1449,6 +1440,13 @@ foreign import ccall "similarity_jaccard_pairs"
     -> Bool
     -> IO CInt
 
+-- | 8\.4\. `igraph_similarity_jaccard_pairs` — Jaccard similarity coefficient for
+-- given vertex pairs.
+--
+-- The Jaccard similarity coefficient of two vertices is the number of common
+-- neighbors divided by the number of vertices that are neighbors of at least
+-- one of the two vertices being considered. This function calculates the
+-- pairwise Jaccard similarities for a list of vertex pairs.
 similarityJaccardPairs :: Graph d a
                        -> [Edge d a]
                        -> Bool -- ^ Whether to include the vertices themselves in the neighbor sets
@@ -1480,13 +1478,6 @@ int igraph_similarity_jaccard_es(const igraph_t *graph, igraph_vector_t *res,
 
 -- TODO: Implement edge selectors
 
-{-
-8.6. igraph_similarity_dice — Dice similarity coefficient.
-
-int igraph_similarity_dice(const igraph_t *graph, igraph_matrix_t *res,
-    const igraph_vs_t vids, igraph_neimode_t mode, igraph_bool_t loops);
--}
-
 foreign import ccall "similarity_dice"
   c_igraph_similarity_dice
     :: GraphPtr
@@ -1496,6 +1487,12 @@ foreign import ccall "similarity_dice"
     -> Bool
     -> IO CInt
 
+-- | 8\.6\. `igraph_similarity_dice` — Dice similarity coefficient.
+--
+-- The Dice similarity coefficient of two vertices is twice the number of
+-- common neighbors divided by the sum of the degrees of the vertices. This
+-- function calculates the pairwise Dice similarities for some (or all) of the
+-- vertices.
 similarityDice :: Graph d a
                -> VertexSelector a
                -> Bool -- ^ Whether to include the vertices themselves as their own neighbors
@@ -1516,13 +1513,6 @@ similarityDice g vs loops = unsafePerformIO $ do
   res <- matrixToList m
   return $ zip sel (map (zip sel) res)
 
-{-
-8.7. igraph_similarity_dice_pairs — Dice similarity coefficient for given vertex pairs.
-
-int igraph_similarity_dice_pairs(const igraph_t *graph, igraph_vector_t *res,
-  const igraph_vector_t *pairs, igraph_neimode_t mode, igraph_bool_t loops);
--}
-
 foreign import ccall "igraph_similarity_dice_pairs"
   c_igraph_similarity_dice_pairs
     :: GraphPtr
@@ -1532,6 +1522,13 @@ foreign import ccall "igraph_similarity_dice_pairs"
     -> Bool
     -> IO CInt
 
+-- | 8\.7\. `igraph_similarity_dice_pairs` — Dice similarity coefficient for given
+-- vertex pairs.
+--
+-- The Dice similarity coefficient of two vertices is twice the number of
+-- common neighbors divided by the sum of the degrees of the vertices. This
+-- function calculates the pairwise Dice similarities for a list of vertex
+-- pairs.
 similarityDicePairs :: Graph d a
                     -> [Edge d a]
                     -> Bool -- ^ Whether to include the vertices themselves as their own neighbors
@@ -1562,13 +1559,6 @@ int igraph_similarity_dice_es(const igraph_t *graph, igraph_vector_t *res,
 
 -- TODO: implement edge selectors
 
-{-
-8.9. igraph_similarity_inverse_log_weighted — Vertex similarity based on the inverse logarithm of vertex degrees.
-
-int igraph_similarity_inverse_log_weighted(const igraph_t *graph,
-  igraph_matrix_t *res, const igraph_vs_t vids, igraph_neimode_t mode);
--}
-
 foreign import ccall "similarity_inverse_log_weighted"
   c_igraph_similarity_inverse_log_weighted
     :: GraphPtr
@@ -1577,6 +1567,20 @@ foreign import ccall "similarity_inverse_log_weighted"
     -> CInt
     -> IO CInt
 
+-- | 8\.9\. `igraph_similarity_inverse_log_weighted` — Vertex similarity based on
+-- the inverse logarithm of vertex degrees.
+--
+-- The inverse log-weighted similarity of two vertices is the number of their
+-- common neighbors, weighted by the inverse logarithm of their degrees. It is
+-- based on the assumption that two vertices should be considered more similar
+-- if they share a low-degree common neighbor, since high-degree common
+-- neighbors are more likely to appear even by pure chance.
+--
+-- Isolated vertices will have zero similarity to any other vertex.
+-- Self-similarities are not calculated.
+--
+-- See the following paper for more details: Lada A. Adamic and Eytan Adar:
+-- Friends and neighbors on the Web. Social Networks, 25(3):211-230, 2003.
 similarityInverseLogWeighted
   :: Graph d a
   -> VertexSelector a
