@@ -30,13 +30,13 @@ module Data.IGraph
     -- ** 11\.2 Vertex selector constructors
   , VertexSelector(..) --, NeiMode(..)
 
-    -- ** 11\.3. Generic vertex selector operations
+    -- ** 11\.3 Generic vertex selector operations
   , vsSize, selectedVertices
 
     -- ** 11\.6 Edge selector constructors
   , EdgeSelector(..)
 
-    -- ** 11\.8. Generic edge selector operations
+    -- ** 11\.8 Generic edge selector operations
   , esSize, selectedEdges
 
     -- * Chapter 13\. Structural Properties of Graphs
@@ -1987,10 +1987,6 @@ isLoop g es = unsafePerformIO $ do
   l <- vectorToList v
   return $ zip sel (map (0 /=) l)
 -}
-
-
-
-
 
 --------------------------------------------------------------------------------
 -- 13.14 Mixing patterns
