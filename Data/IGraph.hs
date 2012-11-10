@@ -33,6 +33,9 @@ module Data.IGraph
     -- ** 11\.3. Generic vertex selector operations
   , vsSize, selectedVertices
 
+    -- ** 11\.8. Generic edge selector operations
+  , esSize, selectedEdges
+
     -- * Chapter 13\. Structural Properties of Graphs
 
     -- ** 13\.1 Basic properties
@@ -84,8 +87,10 @@ module Data.IGraph
   , cocitation
   , similarityJaccard
   , similarityJaccardPairs
+  , similarityJaccardEs
   , similarityDice
   , similarityDicePairs
+  , similarityDiceEs
   , similarityInverseLogWeighted
 
     -- ** 13\.9 Spanning Tress
@@ -127,12 +132,11 @@ foreign import ccall "igraph_vs_size"
   c_igraph_vs_size :: GraphPtr -> VsPtr -> Ptr CInt -> IO CInt
 
 vsSize :: Graph d a -> VertexSelector a -> Int
-vsSize g vs = unsafePerformIO $ alloca $ \rp  ->
-  withGraph g $ \gp ->
-    withVs vs g $ \vsp -> do
-      _ <- c_igraph_vs_size gp vsp rp
-      ci <- peek rp 
-      return (fromIntegral ci)
+vsSize g vs = unsafePerformIO $ alloca $ \ip -> do
+  _e <- withGraph g $ \gp ->
+        withVs vs g $ \vsp ->
+          c_igraph_vs_size gp vsp ip
+  fromIntegral `fmap` peek ip 
 
 foreign import ccall "selected_vertices"
   c_selected_vertices :: GraphPtr -> VsPtr -> VectorPtr -> IO Int
@@ -148,6 +152,39 @@ selectedVertices g vs = unsafePerformIO $ do
   l <- vectorToList v
   return (map (idToNode'' g . round) l)
 
+--------------------------------------------------------------------------------
+-- 11.8. Generic edge selector operations
+
+foreign import ccall "igraph_es_size"
+  c_igraph_es_size :: GraphPtr -> EsPtr -> Ptr CInt -> IO CInt
+
+esSize :: Graph d a -> EdgeSelector d a -> Int
+esSize g es = unsafePerformIO $ alloca $ \ip -> do
+  _e <- withGraph g $ \gp ->
+        withEs es g $ \esp ->
+          c_igraph_es_size
+            gp
+            esp
+            ip
+  fromIntegral `fmap` peek ip
+
+
+foreign import ccall "selected_edges"
+  c_selected_edges :: GraphPtr -> EsPtr -> VectorPtr -> IO CInt
+
+selectedEdges :: Graph d a -> EdgeSelector d a -> [Edge d a]
+selectedEdges g es = unsafePerformIO $ do
+  let s = esSize g es
+  v  <- newVector s
+  _e <- withGraph g $ \gp ->
+        withEs es g $ \esp ->
+        withVector v $ \vp ->
+          c_selected_edges
+            gp
+            esp
+            vp
+  l <- vectorToList v
+  return $ map (edgeIdToEdge g . round) l
 
 --------------------------------------------------------------------------------
 -- 13.1 Basic properties
@@ -1483,14 +1520,42 @@ similarityJaccardPairs g@(G _) es loops = unsafePerformIO $ do
   res <- vectorToList r
   return $ zip es res
 
-{-
-8.5. igraph_similarity_jaccard_es — Jaccard similarity coefficient for a given edge selector.
+foreign import ccall "similarity_jaccard_es"
+  c_igraph_similarity_jaccard_es
+    :: GraphPtr
+    -> VectorPtr
+    -> EsPtr
+    -> CInt
+    -> Bool
+    -> IO CInt
 
-int igraph_similarity_jaccard_es(const igraph_t *graph, igraph_vector_t *res,
-  const igraph_es_t es, igraph_neimode_t mode, igraph_bool_t loops);
--}
-
--- TODO: Implement edge selectors
+-- | 8.5. igraph_similarity_jaccard_es — Jaccard similarity coefficient for a
+-- given edge selector.
+--
+-- The Jaccard similarity coefficient of two vertices is the number of common
+-- neighbors divided by the number of vertices that are neighbors of at least
+-- one of the two vertices being considered. This function calculates the
+-- pairwise Jaccard similarities for the endpoints of edges in a given edge
+-- selector.
+similarityJaccardEs
+  :: Graph d a
+  -> EdgeSelector d a
+  -> Bool -- ^ Whether to include the vertices themselves in the neighbor sets
+  -> [(Edge d a, Double)]
+similarityJaccardEs g es b = unsafePerformIO $ do
+  let sel = selectedEdges g es
+  v  <- newVector (length sel)
+  _e <- withGraph g $ \gp ->
+        withVector v $ \vp ->
+        withEs es g $ \esp ->
+          c_igraph_similarity_jaccard_es
+            gp
+            vp
+            esp
+            (getNeiMode g)
+            b
+  l <- vectorToList v
+  return $ zip sel l
 
 foreign import ccall "similarity_dice"
   c_igraph_similarity_dice
@@ -1564,14 +1629,41 @@ similarityDicePairs g@(G _) es loops = unsafePerformIO $ do
   res <- vectorToList r
   return $ zip es res
 
-{-
-8.8. igraph_similarity_dice_es — Dice similarity coefficient for a given edge selector.
+foreign import ccall "similarity_dice_es"
+  c_igraph_similarity_dice_es
+    :: GraphPtr
+    -> VectorPtr
+    -> EsPtr
+    -> CInt
+    -> Bool
+    -> IO CInt
 
-int igraph_similarity_dice_es(const igraph_t *graph, igraph_vector_t *res,
-  const igraph_es_t es, igraph_neimode_t mode, igraph_bool_t loops);
--}
-
--- TODO: implement edge selectors
+-- | 8.8. igraph_similarity_dice_es — Dice similarity coefficient for a given
+-- edge selector.
+--
+-- The Dice similarity coefficient of two vertices is twice the number of common
+-- neighbors divided by the sum of the degrees of the vertices. This function
+-- calculates the pairwise Dice similarities for the endpoints of edges in a
+-- given edge selector.
+similarityDiceEs
+  :: Graph d a
+  -> EdgeSelector d a
+  -> Bool -- ^ Whether to include the vertices themselves as their own neighbors
+  -> [(Edge d a, Double)]
+similarityDiceEs g es b = unsafePerformIO $ do
+  let sel = selectedEdges g es
+  v  <- newVector (length sel)
+  _e <- withGraph g $ \gp ->
+        withVector v $ \vp ->
+        withEs es g $ \esp ->
+          c_igraph_similarity_dice_es
+            gp
+            vp
+            esp
+            (getNeiMode g)
+            b
+  l <- vectorToList v
+  return $ zip sel l
 
 foreign import ccall "similarity_inverse_log_weighted"
   c_igraph_similarity_inverse_log_weighted

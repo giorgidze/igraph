@@ -149,6 +149,26 @@ int selected_vertices(const igraph_t *graph, const igraph_vs_t *vs, igraph_vecto
 
 /*******************************************************************************
  *
+ * 11.8 Generic edge selector operations
+ *
+ */
+
+int selected_edges(const igraph_t *graph, const igraph_es_t *es, igraph_vector_t* v)
+{
+    igraph_eit_t eit;
+    igraph_eit_create(graph, *es, &eit);
+    int i = 0;
+    while (!IGRAPH_EIT_END(eit)) {
+        igraph_vector_set(v, i, IGRAPH_EIT_GET(eit));
+        IGRAPH_EIT_NEXT(eit);
+        i++;
+    }
+    igraph_eit_destroy(&eit);
+    return 0;
+}
+
+/*******************************************************************************
+ *
  * 13.2 Shortest Path Related Functions
  *
  */
@@ -368,10 +388,22 @@ int similarity_jaccard(const igraph_t *graph, igraph_matrix_t *res,
   return igraph_similarity_jaccard(graph, res, *vids, mode, loops);
 }
 
+int similarity_jaccard_es(const igraph_t *graph, igraph_vector_t *res,
+  const igraph_es_t *es, igraph_neimode_t mode, igraph_bool_t loops)
+{
+  return igraph_similarity_jaccard_es(graph, res, *es, mode, loops);
+}
+
 int similarity_dice(const igraph_t *graph, igraph_matrix_t *res,
     const igraph_vs_t *vids, igraph_neimode_t mode, igraph_bool_t loops)
 {
   return igraph_similarity_dice(graph, res, *vids, mode, loops);
+}
+
+int similarity_dice_es(const igraph_t *graph, igraph_vector_t *res,
+  const igraph_es_t *es, igraph_neimode_t mode, igraph_bool_t loops)
+{
+  return igraph_similarity_dice_es(graph, res, *es, mode, loops);
 }
 
 int similarity_inverse_log_weighted(const igraph_t *graph,          
