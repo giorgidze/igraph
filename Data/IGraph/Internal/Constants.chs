@@ -135,12 +135,14 @@ sizeOfVector = {#sizeof vector_t #}
   { IGRAPH_DONT_SIMPLIFY=0,
          IGRAPH_SIMPLIFY }
   deriving (Eq, Show) #}
+-}
 
-{#enum igraph_transitivity_mode_t as
-  { IGRAPH_TRANSITIVITY_NAN=0,
-               IGRAPH_TRANSITIVITY_ZERO }
+{#enum igraph_transitivity_mode_t as TransitivityMode
+  { IGRAPH_TRANSITIVITY_NAN as TransitivityNAN,
+    IGRAPH_TRANSITIVITY_ZERO as TransitivityZero}
   deriving (Eq, Show) #}
 
+{-
 {#enum igraph_spinglass_implementation_t as
   { IGRAPH_SPINCOMM_IMP_ORIG=0,
          IGRAPH_SPINCOMM_IMP_NEG }

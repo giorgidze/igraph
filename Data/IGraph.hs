@@ -90,6 +90,12 @@ module Data.IGraph
 
     -- ** 13\.9 Spanning Tress
   , minimumSpanningTree
+
+    -- ** 13\.10 Transitivity or Clustering Coefficient
+  , transitivityUndirected
+  , transitivityLocalUndirected
+  , transitivityAvglocalUndirected
+  , transitivityBarrat
   ) where
 
 import Data.IGraph.Internal
@@ -1649,6 +1655,149 @@ int igraph_minimum_spanning_tree_unweighted(const igraph_t *graph,
 
 --------------------------------------------------------------------------------
 -- 13.10 Transitivity or Clustering Coefficient
+
+foreign import ccall "igraph_transitivity_undirected"
+  c_igraph_transitivity_undirected
+    :: GraphPtr
+    -> Ptr CDouble
+    -> CInt
+    -> IO CInt
+
+-- | 10\.1\. `igraph_transitivity_undirected` — Calculates the transitivity
+-- (clustering coefficient) of a graph.
+--
+-- The transitivity measures the probability that two neighbors of a vertex are
+-- connected. More precisely, this is the ratio of the triangles and connected
+-- triples in the graph, the result is a single real number. Directed graphs are
+-- considered as undirected ones.
+--
+-- Note that this measure is different from the local transitivity measure (see
+-- `igraph_transitivity_local_undirected()` ) as it calculates a single value for
+-- the whole graph. See the following reference for more details:
+--
+-- S. Wasserman and K. Faust: Social Network Analysis: Methods and Applications.
+-- Cambridge: Cambridge University Press, 1994.
+--
+-- Clustering coefficient is an alternative name for transitivity.
+transitivityUndirected :: Graph d a -> Double
+transitivityUndirected g = unsafePerformIO $ alloca $ \dp -> do
+  _e <- withGraph g $ \gp ->
+          c_igraph_transitivity_undirected
+            gp
+            dp
+            (fromIntegral $ fromEnum TransitivityZero)
+  realToFrac `fmap` peek dp
+
+
+foreign import ccall "transitivity_local_undirected"
+  c_igraph_transitivity_local_undirected
+    :: GraphPtr
+    -> VectorPtr
+    -> VsPtr
+    -> CInt
+    -> IO CInt
+
+-- | 10\.2\. `igraph_transitivity_local_undirected` — Calculates the local
+-- transitivity (clustering coefficient) of a graph.
+--
+-- The transitivity measures the probability that two neighbors of a vertex are
+-- connected. In case of the local transitivity, this probability is calculated
+-- separately for each vertex.
+--
+-- Note that this measure is different from the global transitivity measure (see
+-- igraph_transitivity_undirected() ) as it calculates a transitivity value for
+-- each vertex individually. See the following reference for more details:
+--
+-- D. J. Watts and S. Strogatz: Collective dynamics of small-world networks.
+-- Nature 393(6684):440-442 (1998).
+--
+-- Clustering coefficient is an alternative name for transitivity.
+transitivityLocalUndirected :: Graph d a -> VertexSelector a -> [(a,Double)]
+transitivityLocalUndirected g vs = unsafePerformIO $ do
+  v  <- newVector 0
+  _e <- withGraph g $ \gp ->
+        withVector v $ \vp ->
+        withVs vs g $ \vsp ->
+          c_igraph_transitivity_local_undirected
+            gp
+            vp
+            vsp
+            (fromIntegral $ fromEnum TransitivityZero)
+  let sel = selectedVertices g vs
+  r <- vectorToList v
+  return $ zip sel r
+
+foreign import ccall "igraph_transitivity_avglocal_undirected"
+  c_igraph_transitivity_avglocal_undirected
+    :: GraphPtr
+    -> Ptr CDouble
+    -> CInt
+    -> IO CInt
+
+-- | 10\.3\. `igraph_transitivity_avglocal_undirected` — Average local transitivity
+-- (clustering coefficient).
+--
+-- The transitivity measures the probability that two neighbors of a vertex are
+-- connected. In case of the average local transitivity, this probability is
+-- calculated for each vertex and then the average is taken. Vertices with less
+-- than two neighbors require special treatment, they will either be left out
+-- from the calculation or they will be considered as having zero transitivity,
+-- depending on the mode argument.
+--
+-- Note that this measure is different from the global transitivity measure (see
+-- `igraph_transitivity_undirected()` ) as it simply takes the average local
+-- transitivity across the whole network. See the following reference for more
+-- details:
+--
+-- D. J. Watts and S. Strogatz: Collective dynamics of small-world networks.
+-- Nature 393(6684):440-442 (1998).
+--
+-- Clustering coefficient is an alternative name for transitivity.
+transitivityAvglocalUndirected :: Graph d a -> Double
+transitivityAvglocalUndirected g = unsafePerformIO $ alloca $ \dp -> do
+  _e <- withGraph g $ \gp ->
+          c_igraph_transitivity_avglocal_undirected
+            gp
+            dp
+            (fromIntegral $ fromEnum TransitivityZero)
+  realToFrac `fmap` peek dp
+
+foreign import ccall "transitivity_barrat"
+  c_igraph_transitivity_barrat
+    :: GraphPtr
+    -> VectorPtr
+    -> VsPtr
+    -> VectorPtr
+    -> CInt
+    -> IO CInt
+
+-- | 10\.4\. `igraph_transitivity_barrat` — Weighted transitivity, as defined by A.
+-- Barrat.
+--
+-- This is a local transitivity, i.e. a vertex-level index. For a given vertex
+-- i, from all triangles in which it participates we consider the weight of the
+-- edges incident on i. The transitivity is the sum of these weights divided by
+-- twice the strength of the vertex (see `igraph_strength()`) and the degree of
+-- the vertex minus one. See Alain Barrat, Marc Barthelemy, Romualdo
+-- Pastor-Satorras, Alessandro Vespignani: The architecture of complex weighted
+-- networks, Proc. Natl. Acad. Sci. USA 101, 3747 (2004) at
+-- http://arxiv.org/abs/cond-mat/0311416 for the exact formula.
+transitivityBarrat :: Graph d a -> VertexSelector a -> [(a,Double)]
+transitivityBarrat g vs = unsafePerformIO $ do
+  v  <- newVector 0
+  _e <- withGraph g $ \gp ->
+        withVector v $ \vp ->
+        withVs vs g $ \vsp ->
+        withOptionalWeights g $ \wp ->
+          c_igraph_transitivity_barrat
+            gp
+            vp
+            vsp
+            wp
+            (fromIntegral $ fromEnum TransitivityZero)
+  r <- vectorToList v
+  return $ zip (selectedVertices g vs) r
+
 
 --------------------------------------------------------------------------------
 -- 13.11 Directedness conversion

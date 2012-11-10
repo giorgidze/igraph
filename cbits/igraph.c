@@ -361,3 +361,26 @@ int similarity_inverse_log_weighted(const igraph_t *graph,
 {
   return igraph_similarity_inverse_log_weighted(graph, res, *vids, mode);
 }
+
+/*******************************************************************************
+ *
+ * 13.10
+ *
+ */
+
+int transitivity_local_undirected(const igraph_t *graph,
+           igraph_vector_t *res,
+           const igraph_vs_t *vids,
+           igraph_transitivity_mode_t mode)
+{
+  return igraph_transitivity_local_undirected(graph, res, *vids, mode);
+}
+
+int transitivity_barrat(const igraph_t *graph,
+                igraph_vector_t *res,
+                const igraph_vs_t *vids,
+                const igraph_vector_t *weights,
+                igraph_transitivity_mode_t mode)
+{
+  return igraph_transitivity_barrat(graph, res, *vids, weights, mode);
+}
