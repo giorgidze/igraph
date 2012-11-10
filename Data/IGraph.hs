@@ -1431,7 +1431,7 @@ similarityJaccard g vs loops = unsafePerformIO $ do
   ids <- matrixToList m
   return $ zip selected (map (zip selected) ids)
 
-foreign import ccall "similarity_jaccard_pairs"
+foreign import ccall "igraph_similarity_jaccard_pairs"
   c_igraph_similarity_jaccard_pairs
     :: GraphPtr
     -> VectorPtr
