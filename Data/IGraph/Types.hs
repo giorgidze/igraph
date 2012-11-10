@@ -36,6 +36,9 @@ type VsPtr     = Ptr Vs
 type VsIdent a = (a -> Maybe Int)
 newtype VsForeignPtr = VsF { unVsF :: ForeignPtr Vs }
 
+data Es
+type EsPtr     = Ptr Es
+newtype EsForeignPtr = EsF { unEsF :: ForeignPtr Es }
 
 --------------------------------------------------------------------------------
 -- Graph representation
@@ -164,7 +167,7 @@ instance IsUndirected (Weighted U) (Weighted D) where
   undirectedToDirected (W e w) = W (undirectedToDirected e) w
 
 --------------------------------------------------------------------------------
--- Vertex selectors
+-- Vertex & edge selectors
 
 data VertexSelector a
   = VsAll
@@ -173,3 +176,12 @@ data VertexSelector a
   | VsList   [a]
   | VsAdj    a
   | VsNonAdj a
+
+data EdgeSelector d a
+  = EsAll
+  | EsNone
+  | EsIncident  a
+  | EsSeq       a a
+  | EsFromTo    (VertexSelector a) (VertexSelector a)
+  | Es1         (Edge d a)
+  | EsList      [Edge d a]

@@ -101,13 +101,15 @@ sizeOfVector = {#sizeof vector_t #}
 --
 -- TODO
 --
+-}
 
-{#enum igraph_edgeorder_type_t as
-  { IGRAPH_EDGEORDER_ID=0,
-         IGRAPH_EDGEORDER_FROM,
-         IGRAPH_EDGEORDER_TO }
+{#enum igraph_edgeorder_type_t as EdgeOrder
+  { IGRAPH_EDGEORDER_ID   as EdgeOrderId,
+    IGRAPH_EDGEORDER_FROM as EdgeOrderFrom,
+    IGRAPH_EDGEORDER_TO   as EdgeOrderTo}
   deriving (Eq, Show) #}
 
+{-
 {#enum igraph_to_directed_t as
   { IGRAPH_TO_DIRECTED_ARBITRARY=0,
          IGRAPH_TO_DIRECTED_MUTUAL }

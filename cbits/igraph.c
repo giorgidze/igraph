@@ -92,6 +92,24 @@ void c_igraph_vs_destroy (igraph_vs_t* vs)
     return;
 }
 
+igraph_es_t* c_igraph_es_create()
+{
+    igraph_es_t* es = (igraph_es_t*) malloc(sizeof(igraph_es_t));
+    return es;
+}
+
+void c_igraph_es_destroy(igraph_es_t* es)
+{
+    if (es)
+        igraph_es_destroy(es);
+    free(es);
+    return;
+}
+
+int es_fromto(igraph_es_t *es, igraph_vs_t *from, igraph_vs_t *to)
+{
+  return igraph_es_fromto(es, *from, *to);
+}
 
 /*******************************************************************************
  * 

@@ -26,6 +26,11 @@ idToNode'' (G g) i = case Map.lookup i (graphIdToNode g) of
   Just n  -> n
   Nothing -> error ("idToNode': Graph ID/node mismatch, ID = " ++ show i)
 
+edgeToEdgeId :: Graph d a -> Edge d a -> Int
+edgeToEdgeId g@(G _) e = case elemIndex e (edges g) of
+  Just i -> i
+  _      -> error ("edgeToEdgeId: Edge not in graph.")
+
 edgeIdToEdge :: Graph d a -> Int -> Edge d a
 edgeIdToEdge g i
   | i < 0 || i >= length es = error ("edgeIdToEdge: Index " ++ show i ++ " out of bound.")
@@ -156,6 +161,58 @@ withVs vs g f = do
 withVs' :: VsForeignPtr -> (VsPtr -> IO res) -> IO res
 withVs' (VsF fp) = withForeignPtr fp
 
+--------------------------------------------------------------------------------
+-- Edge selectors
+
+foreign import ccall "c_igraph_es_create"
+  c_igraph_es_create :: IO EsPtr
+foreign import ccall "&c_igraph_es_destroy"
+  c_igraph_es_destroy :: FunPtr (EsPtr -> IO ())
+
+newEs :: IO EsForeignPtr
+newEs = do
+  esp <- c_igraph_es_create
+  fep <- newForeignPtr c_igraph_es_destroy esp
+  return $ EsF fep
+
+foreign import ccall "igraph_es_all"
+  c_igraph_es_all       :: EsPtr -> CInt -> IO CInt
+foreign import ccall "igraph_es_none"
+  c_igraph_es_none      :: EsPtr -> IO CInt
+foreign import ccall "igraph_es_incident"
+  c_igraph_es_incident  :: EsPtr -> CInt -> CInt -> IO CInt
+foreign import ccall "igraph_es_1"
+  c_igraph_es_1         :: EsPtr -> CInt -> IO CInt
+foreign import ccall "igraph_es_vector"
+  c_igraph_es_vector    :: EsPtr -> VectorPtr -> IO CInt
+foreign import ccall "es_fromto"
+  c_igraph_es_fromto    :: EsPtr -> VsPtr -> VsPtr -> IO CInt
+foreign import ccall "igraph_es_seq"
+  c_igraph_es_seq       :: EsPtr -> CInt -> CInt -> IO CInt
+
+withEs :: EdgeSelector d a -> Graph d a -> (EsPtr -> IO res) -> IO res
+withEs es g f = do
+  fes <- newEs
+  _e  <- withEs' fes $ \esp ->
+    case es of
+         EsAll            -> c_igraph_es_all      esp (fromIntegral $ fromEnum EdgeOrderId)
+         EsNone           -> c_igraph_es_none     esp
+         EsIncident a     -> c_igraph_es_incident esp (ident a) (getNeiMode g)
+         EsSeq a b        -> c_igraph_es_seq      esp (ident a) (ident b)
+         Es1 e            -> c_igraph_es_1        esp (ident' e)
+         EsFromTo vs1 vs2 -> withVs vs1 g $ \vsp1 -> withVs vs2 g $ \vsp2 ->
+                             c_igraph_es_fromto   esp vsp1 vsp2
+         EsList l         -> do
+           v <- listToVector (map (edgeToEdgeId g) l)
+           withVector v $ \vp ->
+             c_igraph_es_vector esp vp
+  withEs' fes f
+ where
+  ident  a = fromIntegral (nodeToId''   g a) :: CInt
+  ident' a = fromIntegral (edgeToEdgeId g a) :: CInt
+
+withEs' :: EsForeignPtr -> (EsPtr -> IO res) -> IO res
+withEs' (EsF fp) = withForeignPtr fp
 
 --------------------------------------------------------------------------------
 -- Matrices
