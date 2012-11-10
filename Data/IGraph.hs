@@ -85,6 +85,9 @@ module Data.IGraph
   , similarityDice
   , similarityDicePairs
   , similarityInverseLogWeighted
+
+    -- ** 13\.9 Spanning Tress
+  , minimumSpanningTree
   ) where
 
 import Data.IGraph.Internal
@@ -1603,6 +1606,44 @@ similarityInverseLogWeighted g vs = unsafePerformIO $ do
 
 --------------------------------------------------------------------------------
 -- 13.9 Spanning Trees
+
+foreign import ccall "igraph_minimum_spanning_tree"
+  c_igraph_minimum_spanning_tree
+    :: GraphPtr
+    -> VectorPtr
+    -> VectorPtr
+    -> IO CInt
+
+-- | 9\.1\. `igraph_minimum_spanning_tree` — Calculates one minimum spanning tree of a graph.
+--
+-- If the graph has more minimum spanning trees (this is always the case, except
+-- if it is a forest) this implementation returns only the same one.
+--
+-- Directed graphs are considered as undirected for this computation.
+--
+-- If the graph is not connected then its minimum spanning forest is returned.
+-- This is the set of the minimum spanning trees of each component.
+minimumSpanningTree :: Graph d a -> [Edge d a]
+minimumSpanningTree g@(G _) = unsafePerformIO $ do
+  v  <- newVector 0
+  _e <- withGraph g $ \gp ->
+        withVector v $ \vp ->
+        withOptionalWeights g $ \wp ->
+          c_igraph_minimum_spanning_tree
+            gp
+            vp
+            wp
+  vectorToEdges g v
+
+{- 9.2. igraph_minimum_spanning_tree_unweighted — Calculates one minimum
+ - spanning tree of an unweighted graph.
+
+int igraph_minimum_spanning_tree_unweighted(const igraph_t *graph, 
+              igraph_t *mst);
+
+-- TODO
+-}
+
 
 --------------------------------------------------------------------------------
 -- 13.10 Transitivity or Clustering Coefficient
