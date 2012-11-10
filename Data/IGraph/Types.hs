@@ -27,6 +27,10 @@ data Mat
 type MatrixPtr    = Ptr Mat
 newtype Matrix    = Matrix    { unM  :: ForeignPtr Mat }
 
+data SpMat
+type SpMatrixPtr     = Ptr SpMat
+--newtype SparseMatrix = SparseMatrix { unSM :: ForeignPtr SpMat }
+
 data Vs
 type VsPtr     = Ptr Vs
 type VsIdent a = (a -> Maybe Int)

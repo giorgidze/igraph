@@ -209,6 +209,58 @@ matrixToList m = withMatrix m $ \mp -> do
       c_igraph_matrix_get_row mp vp r
     vectorToList v
 
+--------------------------------------------------------------------------------
+-- Sparse matrices
+
+{-
+foreign import ccall "c_igraph_sparsemat_create"
+  c_igraph_sparsemat_create  :: CLong -> CLong -> IO SpMatrixPtr
+foreign import ccall "&c_igraph_sparsemat_destroy"
+  c_igraph_sparsemat_destroy :: FunPtr (SpMatrixPtr -> IO ())
+foreign import ccall "igraph_sparsemat_set"
+  c_igraph_sparsemat_set     :: SpMatrixPtr -> CLong -> CLong -> CDouble -> IO ()
+
+--foreign import ccall "igraph_sparsemat_nrow"
+--  c_igraph_sparsemat_nrow    :: SpMatrixPtr -> IO CLong
+--foreign import ccall "igraph_sparsemat_ncol"
+--  c_igraph_sparsemat_ncol    :: SpMatrixPtr -> IO CLong
+--foreign import ccall "igraph_sparsemat_get_row" -- does not exist!
+--  c_igraph_sparsemat_get_row :: SpMatrixPtr -> VectorPtr -> CLong -> IO CInt
+
+newSparseMatrix :: Int -> Int -> IO SparseMatrix
+newSparseMatrix nrow ncol = do
+  mp  <- c_igraph_sparsemat_create (fromIntegral nrow) (fromIntegral ncol)
+  fmp <- newForeignPtr c_igraph_sparsemat_destroy mp
+  return $ SparseMatrix fmp
+
+listToSparseMatrix :: Integral a => [[a]] -> IO SparseMatrix
+listToSparseMatrix l = do
+  sm <- newSparseMatrix nrow ncol
+  withSparseMatrix sm $ \smp ->
+    -- fill the matrix
+    forListM_ (zip [0..] l)     $ \(r,row) ->
+      forListM_ (zip [0..] row) $ \(c,val) ->
+        c_igraph_sparsemat_set smp r c (fromIntegral val)
+  return sm
+ where
+  nrow = maximum (map length l)
+  ncol = length l
+
+{-
+sparseMatrixToList :: SparseMatrix -> IO [[Double]]
+sparseMatrixToList sm = withSparseMatrix sm $ \smp -> do
+  nrow <- c_igraph_sparsemat_nrow smp
+  ncol <- c_igraph_sparsemat_ncol smp
+  forM [0..nrow-1] $ \r -> do
+    v  <- newVector (fromIntegral ncol)
+    _e <- withVector v $ \vp ->
+      c_igraph_sparsemat_get_row
+        smp
+        vp
+        r
+    vectorToList v
+-}
+-}
 
 --------------------------------------------------------------------------------
 -- Vectors
@@ -318,6 +370,10 @@ withVector (Vector fvp) = withForeignPtr fvp
 withVectorPtr :: VectorP -> (VectorPtrPtr -> IO a) -> IO a
 withVectorPtr (VectorP fvp) = withForeignPtr fvp
 
+{-
+withSparseMatrix :: SparseMatrix -> (SpMatrixPtr -> IO a) -> IO a
+withSparseMatrix (SparseMatrix fmp) = withForeignPtr fmp
+-}
 
 --------------------------------------------------------------------------------
 -- Foreign imports
