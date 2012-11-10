@@ -434,3 +434,16 @@ int transitivity_barrat(const igraph_t *graph,
 {
   return igraph_transitivity_barrat(graph, res, *vids, weights, mode);
 }
+
+/*******************************************************************************
+ *
+ * 13.13
+ *
+ */
+
+int is_loop(const igraph_t *graph, igraph_vector_bool_t *res, 
+       igraph_es_t *es)
+{
+  return igraph_is_loop(graph, res, *es);
+}
+

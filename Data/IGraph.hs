@@ -33,6 +33,9 @@ module Data.IGraph
     -- ** 11\.3. Generic vertex selector operations
   , vsSize, selectedVertices
 
+    -- ** 11\.6 Edge selector constructors
+  , EdgeSelector(..)
+
     -- ** 11\.8. Generic edge selector operations
   , esSize, selectedEdges
 
@@ -104,6 +107,7 @@ module Data.IGraph
 
     -- ** 13\.12 Spectral properties
   , laplacian
+
   ) where
 
 import Data.IGraph.Internal
@@ -1529,7 +1533,7 @@ foreign import ccall "similarity_jaccard_es"
     -> Bool
     -> IO CInt
 
--- | 8.5. igraph_similarity_jaccard_es — Jaccard similarity coefficient for a
+-- | 8\.5\. `igraph_similarity_jaccard_es` — Jaccard similarity coefficient for a
 -- given edge selector.
 --
 -- The Jaccard similarity coefficient of two vertices is the number of common
@@ -1638,7 +1642,7 @@ foreign import ccall "similarity_dice_es"
     -> Bool
     -> IO CInt
 
--- | 8.8. igraph_similarity_dice_es — Dice similarity coefficient for a given
+-- | 8\.8\. `igraph_similarity_dice_es` — Dice similarity coefficient for a given
 -- edge selector.
 --
 -- The Dice similarity coefficient of two vertices is twice the number of common
@@ -1941,6 +1945,52 @@ laplacian g norm = unsafePerformIO $ do
 
 --------------------------------------------------------------------------------
 -- 13.13 Non-simple graphs: multiple and loop edges
+
+{- This whole chapter might not be necessary since we can't have edges from a
+ - vertex to itself or multiple edges in our graph due to the use of Map/Sets!
+
+foreign import ccall "igraph_is_simple"
+  c_igraph_is_simple
+    :: GraphPtr
+    -> Ptr Bool
+    -> IO CInt
+
+-- | 13\.1\. `igraph_is_simple` — Decides whether the input graph is a simple graph.
+--
+-- A graph is a simple graph if it does not contain loop edges and multiple
+-- edges.
+isSimple :: Graph d a -> Bool
+isSimple g = unsafePerformIO $ alloca $ \bp -> do
+  _e <- withGraph g $ \gp ->
+        c_igraph_is_simple
+          gp
+          bp
+  peek bp
+
+foreign import ccall "is_loop"
+  c_igraph_is_loop :: GraphPtr -> VectorPtr -> EsPtr -> IO CInt
+
+-- | 13\.2\. `igraph_is_loop` — Find the loop edges in a graph.
+--
+--A loop edge is an edge from a vertex to itself.
+isLoop :: Graph d a -> EdgeSelector d a -> [(Edge d a, Bool)]
+isLoop g es = unsafePerformIO $ do
+  let sel = selectedEdges g es
+  v  <- newVector (length sel)
+  _e <- withGraph g $ \gp ->
+        withVector v $ \vp ->
+        withEs es g $ \esp ->
+          c_igraph_is_loop
+            gp
+            vp
+            esp
+  l <- vectorToList v
+  return $ zip sel (map (0 /=) l)
+-}
+
+
+
+
 
 --------------------------------------------------------------------------------
 -- 13.14 Mixing patterns
