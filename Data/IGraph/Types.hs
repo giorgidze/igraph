@@ -41,9 +41,6 @@ newtype VsForeignPtr = VsF { unVsF :: ForeignPtr Vs }
 data Graph d a where
   G :: E d a => G d a -> Graph d a
 
-unG :: Graph d a -> G d a
-unG (G g) = g
-
 -- | The internal graph representation.
 data G d a
   = Graph { graphNodeNumber        :: !Int
@@ -119,6 +116,20 @@ instance IsUnweighted D where
   liftIsDirected _ = True
 
 
+class IsDirected d u | d -> u where
+  directedToUndirected :: Edge d a -> Edge u a
+
+instance IsDirected D U where
+  directedToUndirected (D_Edge a b) = (U_Edge a b)
+
+
+class IsUndirected u d | u -> d where
+  undirectedToDirected :: E d a => Edge u a -> Edge d a
+
+instance IsUndirected U D where
+  undirectedToDirected (U_Edge a b) = (D_Edge a b)
+
+
 -- | Weighted graphs, weight defaults to 0
 data Weighted d
 
@@ -142,6 +153,11 @@ instance Show (Edge d a) => Show (Edge (Weighted d) a) where
 instance (E d a, Ord (Edge d a)) => Ord (Edge (Weighted d) a) where
   (W e1 w1) <= (W e2 w2) = (e1,w1) <= (e2,w2)
 
+instance IsDirected (Weighted D) (Weighted U) where
+  directedToUndirected (W e w) = W (directedToUndirected e) w
+
+instance IsUndirected (Weighted U) (Weighted D) where
+  undirectedToDirected (W e w) = W (undirectedToDirected e) w
 
 --------------------------------------------------------------------------------
 -- Vertex selectors

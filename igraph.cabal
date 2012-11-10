@@ -25,6 +25,7 @@ Library
     EmptyDataDecls,
     MultiParamTypeClasses,
     GADTs,
+    FunctionalDependencies
     TypeFamilies,
     FlexibleContexts,
     FlexibleInstances

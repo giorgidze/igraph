@@ -7,13 +7,16 @@ module Data.IGraph
     Graph (..), E (..)
   , D, U, IsUnweighted
   , Weighted, toEdgeWeighted, getWeight
+  , IsUndirected, IsDirected
 
-    -- * Construction
+    -- * Construction / modification
   , emptyGraph
   , fromList, fromListWeighted
   , insertEdge
   , deleteEdge
   , deleteNode
+  , reverseGraphDirection
+  , toDirected, toUndirected
     -- * Query
   , numberOfNodes
   , numberOfEdges
@@ -21,7 +24,6 @@ module Data.IGraph
   , nodes
   , edges
   , neighbours
-  , reverseGraphDirection
 
     -- * Chapter 11. Vertex and Edge Selectors and Sequences, Iterators
 

@@ -457,3 +457,11 @@ reverseGraphDirection (G g) = G g { graphNeiMode = reverse' (graphNeiMode g) }
   reverse' Out = In
   reverse' In  = Out
   reverse' _ = Out
+
+toDirected :: (IsUndirected u d, E d a, E u a) => Graph u a -> Graph d a
+toDirected (G g) =
+  G g { graphEdges = Set.map undirectedToDirected (graphEdges g) }
+
+toUndirected :: (IsDirected d u, E d a, E u a) => Graph d a -> Graph u a
+toUndirected (G g) =
+  G g { graphEdges = Set.map directedToUndirected (graphEdges g) }
