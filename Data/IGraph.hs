@@ -76,6 +76,15 @@ module Data.IGraph
   , centralizationDegreeTMax
   , centralizationBetweennessTMax
   , centralizationClosenessTMax
+
+    -- ** 13\.8 Similarity Measures
+  , bibCoupling
+  , cocitation
+  , similarityJaccard
+  , similarityJaccardPairs
+  , similarityDice
+  , similarityDicePairs
+  , similarityInverseLogWeighted
   ) where
 
 import Data.IGraph.Internal
@@ -1347,47 +1356,246 @@ centralizationClosenessTMax egi = unsafePerformIO $
 
 int igraph_bibcoupling(const igraph_t *graph, igraph_matrix_t *res, 
                        const igraph_vs_t vids);
+-}
 
+foreign import ccall "bibcoupling"
+  c_igraph_bibcoupling :: GraphPtr -> MatrixPtr -> VsPtr -> IO CInt
+
+bibCoupling :: Graph d a -> VertexSelector a -> [(a,[(a,Int)])]
+bibCoupling g vs = unsafePerformIO $ do
+  let selected = selectedVertices g vs
+      nrows    = length selected
+      ncols    = numberOfNodes g
+  m  <- newMatrix nrows ncols
+  _e <- withGraph g $ \gp ->
+        withVs vs g $ \vsp ->
+        withMatrix m $ \mp ->
+          c_igraph_bibcoupling
+            gp
+            mp
+            vsp
+  ids <- map (map round) `fmap` matrixToList m
+  return $ zip selected (map (zip (nodes g)) ids)
+
+{-
 8.2. igraph_cocitation — Cocitation coupling.
 
 int igraph_cocitation(const igraph_t *graph, igraph_matrix_t *res, 
                       const igraph_vs_t vids);
+-}
 
+foreign import ccall "cocitation"
+  c_igraph_cocitation :: GraphPtr -> MatrixPtr -> VsPtr -> IO CInt
+
+cocitation :: Graph d a -> VertexSelector a -> [(a,[(a,Int)])]
+cocitation g vs = unsafePerformIO $ do
+  let selected = selectedVertices g vs
+      nrows    = length selected
+      ncols    = numberOfNodes g
+  m  <- newMatrix nrows ncols
+  _e <- withGraph g $ \gp ->
+        withVs vs g $ \vsp ->
+        withMatrix m $ \mp ->
+          c_igraph_cocitation
+            gp
+            mp
+            vsp
+  ids <- map (map round) `fmap` matrixToList m
+  return $ zip selected (map (zip (nodes g)) ids)
+
+{-
 8.3. igraph_similarity_jaccard — Jaccard similarity coefficient for the given vertices.
 
 int igraph_similarity_jaccard(const igraph_t *graph, igraph_matrix_t *res,
     const igraph_vs_t vids, igraph_neimode_t mode, igraph_bool_t loops);
+-}
 
+foreign import ccall "similarity_jaccard"
+  c_igraph_similarity_jaccard :: GraphPtr -> MatrixPtr -> VsPtr -> CInt -> Bool -> IO CInt
+
+similarityJaccard :: Graph d a
+                  -> VertexSelector a
+                  -> Bool -- ^ Whether to include the vertices themselves in the neighbor sets
+                  -> [(a,[(a,Double)])]
+similarityJaccard g vs loops = unsafePerformIO $ do
+  let selected = selectedVertices g vs
+      nrows    = length selected
+  m  <- newMatrix nrows nrows
+  _e <- withGraph g $ \gp ->
+        withVs vs g $ \vsp ->
+        withMatrix m $ \mp ->
+          c_igraph_similarity_jaccard
+            gp
+            mp
+            vsp
+            (getNeiMode g)
+            loops
+  ids <- matrixToList m
+  return $ zip selected (map (zip selected) ids)
+
+{-
 8.4. igraph_similarity_jaccard_pairs — Jaccard similarity coefficient for given vertex pairs.
 
 int igraph_similarity_jaccard_pairs(const igraph_t *graph, igraph_vector_t *res,
   const igraph_vector_t *pairs, igraph_neimode_t mode, igraph_bool_t loops);
+-}
 
+foreign import ccall "similarity_jaccard_pairs"
+  c_igraph_similarity_jaccard_pairs
+    :: GraphPtr
+    -> VectorPtr
+    -> VectorPtr
+    -> CInt
+    -> Bool
+    -> IO CInt
+
+similarityJaccardPairs :: Graph d a
+                       -> [Edge d a]
+                       -> Bool -- ^ Whether to include the vertices themselves in the neighbor sets
+                       -> [(Edge d a,Double)]
+similarityJaccardPairs g@(G _) es loops = unsafePerformIO $ do
+  p   <- listToVector $
+           foldr (\e r -> nodeToId'' g (edgeFrom e):nodeToId'' g (edgeTo e):r)
+                 []
+                 es
+  r   <- newVector (length es)
+  _e  <- withGraph g $ \gp ->
+         withVector r $ \rp ->
+         withVector p $ \pp ->
+           c_igraph_similarity_jaccard_pairs
+             gp
+             rp
+             pp
+             (getNeiMode g)
+             loops
+  res <- vectorToList r
+  return $ zip es res
+
+{-
 8.5. igraph_similarity_jaccard_es — Jaccard similarity coefficient for a given edge selector.
 
 int igraph_similarity_jaccard_es(const igraph_t *graph, igraph_vector_t *res,
   const igraph_es_t es, igraph_neimode_t mode, igraph_bool_t loops);
+-}
 
+-- TODO: Implement edge selectors
+
+{-
 8.6. igraph_similarity_dice — Dice similarity coefficient.
 
 int igraph_similarity_dice(const igraph_t *graph, igraph_matrix_t *res,
     const igraph_vs_t vids, igraph_neimode_t mode, igraph_bool_t loops);
+-}
 
+foreign import ccall "similarity_dice"
+  c_igraph_similarity_dice
+    :: GraphPtr
+    -> MatrixPtr
+    -> VsPtr
+    -> CInt
+    -> Bool
+    -> IO CInt
+
+similarityDice :: Graph d a
+               -> VertexSelector a
+               -> Bool -- ^ Whether to include the vertices themselves as their own neighbors
+               -> [(a,[(a,Double)])]
+similarityDice g vs loops = unsafePerformIO $ do
+  let sel = selectedVertices g vs
+      n   = length sel
+  m  <- newMatrix n n
+  _e <- withGraph g $ \gp ->
+        withVs vs g $ \vsp ->
+        withMatrix m $ \mp ->
+          c_igraph_similarity_dice
+            gp
+            mp
+            vsp
+            (getNeiMode g)
+            loops
+  res <- matrixToList m
+  return $ zip sel (map (zip sel) res)
+
+{-
 8.7. igraph_similarity_dice_pairs — Dice similarity coefficient for given vertex pairs.
 
 int igraph_similarity_dice_pairs(const igraph_t *graph, igraph_vector_t *res,
   const igraph_vector_t *pairs, igraph_neimode_t mode, igraph_bool_t loops);
+-}
 
+foreign import ccall "igraph_similarity_dice_pairs"
+  c_igraph_similarity_dice_pairs
+    :: GraphPtr
+    -> VectorPtr
+    -> VectorPtr
+    -> CInt
+    -> Bool
+    -> IO CInt
+
+similarityDicePairs :: Graph d a
+                    -> [Edge d a]
+                    -> Bool -- ^ Whether to include the vertices themselves as their own neighbors
+                    -> [(Edge d a, Double)]
+similarityDicePairs g@(G _) es loops = unsafePerformIO $ do
+  v  <- listToVector $
+          foldr (\e r -> nodeToId'' g (edgeFrom e) : nodeToId'' g (edgeTo e) : r)
+                [] es
+  r  <- newVector (length es)
+  _e <- withGraph g $ \gp ->
+        withVector r $ \rp ->
+        withVector v $ \vp ->
+          c_igraph_similarity_dice_pairs
+            gp
+            rp
+            vp
+            (getNeiMode g)
+            loops
+  res <- vectorToList r
+  return $ zip es res
+
+{-
 8.8. igraph_similarity_dice_es — Dice similarity coefficient for a given edge selector.
 
 int igraph_similarity_dice_es(const igraph_t *graph, igraph_vector_t *res,
   const igraph_es_t es, igraph_neimode_t mode, igraph_bool_t loops);
+-}
 
+-- TODO: implement edge selectors
+
+{-
 8.9. igraph_similarity_inverse_log_weighted — Vertex similarity based on the inverse logarithm of vertex degrees.
 
 int igraph_similarity_inverse_log_weighted(const igraph_t *graph,
   igraph_matrix_t *res, const igraph_vs_t vids, igraph_neimode_t mode);
 -}
+
+foreign import ccall "similarity_inverse_log_weighted"
+  c_igraph_similarity_inverse_log_weighted
+    :: GraphPtr
+    -> MatrixPtr
+    -> VsPtr
+    -> CInt
+    -> IO CInt
+
+similarityInverseLogWeighted
+  :: Graph d a
+  -> VertexSelector a
+  -> [(a,[(a,Double)])]
+similarityInverseLogWeighted g vs = unsafePerformIO $ do
+  let sel   = selectedVertices g vs
+      nrows = length sel
+      ncols = numberOfNodes g
+  m  <- newMatrix nrows ncols
+  _e <- withGraph g $ \gp ->
+        withMatrix m $ \mp ->
+        withVs vs g $ \vsp ->
+          c_igraph_similarity_inverse_log_weighted
+            gp
+            mp
+            vsp
+            (getNeiMode g)
+  r  <- matrixToList m
+  return $ zip sel (map (zip (nodes g)) r)
 
 --------------------------------------------------------------------------------
 -- 13.9 Spanning Trees

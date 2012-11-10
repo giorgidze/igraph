@@ -325,3 +325,39 @@ int betweenness_estimate(const igraph_t *graph,
 {
     return igraph_betweenness_estimate(graph, res, *vids, directed, cutoff, weights, nobigint);
 }
+
+/*******************************************************************************
+ *
+ * 13.8 Similarity Measures
+ *
+ */
+
+int bibcoupling(const igraph_t *graph, igraph_matrix_t *res, 
+                const igraph_vs_t *vids)
+{
+  return igraph_bibcoupling(graph, res, *vids);
+}
+
+int cocitation(const igraph_t *graph, igraph_matrix_t *res,
+               const igraph_vs_t *vids)
+{
+  return igraph_cocitation(graph, res, *vids);
+}
+
+int similarity_jaccard(const igraph_t *graph, igraph_matrix_t *res,          
+    const igraph_vs_t *vids, igraph_neimode_t mode, igraph_bool_t loops)
+{
+  return igraph_similarity_jaccard(graph, res, *vids, mode, loops);
+}
+
+int similarity_dice(const igraph_t *graph, igraph_matrix_t *res,
+    const igraph_vs_t *vids, igraph_neimode_t mode, igraph_bool_t loops)
+{
+  return igraph_similarity_dice(graph, res, *vids, mode, loops);
+}
+
+int similarity_inverse_log_weighted(const igraph_t *graph,          
+  igraph_matrix_t *res, const igraph_vs_t *vids, igraph_neimode_t mode)
+{
+  return igraph_similarity_inverse_log_weighted(graph, res, *vids, mode);
+}
