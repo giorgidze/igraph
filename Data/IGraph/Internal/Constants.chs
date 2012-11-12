@@ -169,12 +169,14 @@ sizeOfVector = {#sizeof vector_t #}
          IGRAPH_BARABASI_PSUMTREE,
          IGRAPH_BARABASI_PSUMTREE_MULTIPLE}
   deriving (Eq, Show) #}
+-}
 
-{#enum igraph_fas_algorithm_t as
-  { IGRAPH_FAS_EXACT_IP = 0,
-         IGRAPH_FAS_APPROX_EADES }
+{#enum igraph_fas_algorithm_t as FASAlgorithm
+  { IGRAPH_FAS_EXACT_IP     as ExactIP
+  , IGRAPH_FAS_APPROX_EADES as ApproxEades }
   deriving (Eq, Show) #}
 
+{-
 {#enum igraph_subgraph_implementation_t as
   { IGRAPH_SUBGRAPH_AUTO = 0,
              IGRAPH_SUBGRAPH_COPY_AND_DELETE,

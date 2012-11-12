@@ -108,6 +108,23 @@ module Data.IGraph
     -- ** 13\.12 Spectral properties
   , laplacian
 
+    -- ** 13\.14 Mixing patterns
+  , assortativityNominal
+  , assortativity
+  , assortativityDegree
+
+    -- ** 13\.15 K-Cores
+  , coreness
+
+    -- ** 13\.16 Topological sorting, directed acyclic graphs
+  , isDAG
+  , topologicalSorting
+  , FASAlgorithm(..)
+  , feedbackArcSet
+
+    -- ** 13\.17 Maximum cardinality search, graph decomposition, chordal graphs
+  , maximumCardinalitySearch
+  , isChordal
   ) where
 
 import Data.IGraph.Internal
@@ -118,6 +135,7 @@ import Data.Hashable
 import Data.Map (Map)
 import qualified Data.Map as M
 import qualified Data.Foldable as F
+import Data.List (nub)
 
 import Foreign hiding (unsafePerformIO)
 import Foreign.C
@@ -1991,14 +2009,301 @@ isLoop g es = unsafePerformIO $ do
 --------------------------------------------------------------------------------
 -- 13.14 Mixing patterns
 
+foreign import ccall "igraph_assortativity_nominal"
+  c_igraph_assortativity_nominal
+    :: GraphPtr
+    -> VectorPtr
+    -> Ptr CDouble
+    -> Bool
+    -> IO CInt
+
+-- | 14\\.1\. `igraph_assortativity_nominal` — Assortativity of a graph based on
+-- vertex categories
+--
+-- Assuming the vertices of the input graph belong to different categories, this
+-- function calculates the assortativity coefficient of the graph. The
+-- assortativity coefficient is between minus one and one and it is one if all
+-- connections stay within categories, it is minus one, if the network is
+-- perfectly disassortative. For a randomly connected network it is
+-- (asymptotically) zero.
+--
+-- See equation (2) in M. E. J. Newman: Mixing patterns in networks, Phys. Rev.
+-- E 67, 026126 (2003) (http://arxiv.org/abs/cond-mat/0209450) for the proper
+-- definition.
+assortativityNominal
+  :: (Eq vertexType)
+  => Graph d (vertexType, a)
+  -> Bool -- ^ whether to consider edge directions in a directed graph. It is
+          -- ignored for undirected graphs
+  -> Double
+assortativityNominal g b = unsafePerformIO $ alloca $ \dp -> do
+  let all_types = map fst $ nodes g
+      types     = map fst $ zip [(0 :: Int)..] (nub all_types)
+  v  <- listToVector types
+  _e <- withGraph g $ \gp ->
+        withVector v $ \vp ->
+          c_igraph_assortativity_nominal
+            gp
+            vp
+            dp
+            b
+  realToFrac `fmap` peek dp
+
+foreign import ccall "igraph_assortativity"
+  c_igraph_assortativity
+    :: GraphPtr
+    -> VectorPtr
+    -> VectorPtr
+    -> Ptr CDouble
+    -> Bool
+    -> IO CInt
+
+-- | 14\.2\. `igraph_assortativity` — Assortativity based on numeric properties of
+-- vertices
+--
+-- This function calculates the assortativity coefficient of the input graph.
+-- This coefficient is basically the correlation between the actual connectivity
+-- patterns of the vertices and the pattern expected from the distribution of
+-- the vertex types.
+--
+-- See equation (21) in M. E. J. Newman: Mixing patterns in networks, Phys. Rev.
+-- E 67, 026126 (2003) (http://arxiv.org/abs/cond-mat/0209450) for the proper
+-- definition. The actual calculation is performed using equation (26) in the
+-- same paper for directed graphs, and equation (4) in M. E. J. Newman:
+-- Assortative mixing in networks, Phys. Rev. Lett. 89, 208701 (2002)
+-- (http://arxiv.org/abs/cond-mat/0205405/) for undirected graphs.
+assortativity
+  :: (Eq vertexTypeIncoming, Eq vertexTypeOutgoing)
+  => Graph d (vertexTypeIncoming, vertexTypeOutgoing, a)
+  -> Bool -- ^ whether to consider edge directions for directed graphs. It is
+          -- ignored for undirected graphs
+  -> Double
+assortativity g b = unsafePerformIO $ alloca $ \dp -> do
+  let (all_types_inc, all_types_out) = unzip [ (i,o) | (i,o,_) <- nodes g ]
+      types_inc = map fst $ zip [(0 :: Int)..] (nub all_types_inc)
+      types_out = map fst $ zip [(0 :: Int)..] (nub all_types_out)
+  v1 <- listToVector types_inc
+  v2 <- listToVector types_out
+  _e <- withGraph g $ \gp ->
+        withVector v1 $ \vp1 ->
+        withVector v2 $ \vp2 ->
+          c_igraph_assortativity
+            gp
+            vp1
+            vp2
+            dp
+            b
+  realToFrac `fmap` peek dp
+
+foreign import ccall "igraph_assortativity_degree"
+  c_igraph_assortativity_degree
+    :: GraphPtr
+    -> Ptr CDouble
+    -> Bool
+    -> IO CInt
+
+-- | 14\.3\. `igraph_assortativity_degree` — Assortativity of a graph based on vertex
+-- degree
+--
+-- Assortativity based on vertex degree, please see the discussion at the
+-- documentation of igraph_assortativity() for details.
+assortativityDegree
+  :: Graph d a
+  -> Bool -- ^ whether to consider edge directions for directed graphs. This
+          -- argument is ignored for undirected graphs. Supply `True` here to
+          -- do the natural thing, i.e. use directed version of the measure for
+          -- directed graphs and the undirected version for undirected graphs.
+  -> Double
+assortativityDegree g b = unsafePerformIO $ alloca $ \dp -> do
+  _e <- withGraph g $ \gp ->
+          c_igraph_assortativity_degree
+            gp
+            dp
+            b
+  realToFrac `fmap` peek dp
+
 --------------------------------------------------------------------------------
 -- 13.15 K-Cores
+
+foreign import ccall "igraph_coreness"
+  c_igraph_coreness
+    :: GraphPtr
+    -> VectorPtr
+    -> CInt
+    -> IO CInt
+
+-- | 15\.1\. `igraph_coreness` — Finding the coreness of the vertices in a network.
+--
+-- The k-core of a graph is a maximal subgraph in which each vertex has at least
+-- degree k. (Degree here means the degree in the subgraph of course.). The
+-- coreness of a vertex is the highest order of a k-core containing the vertex.
+--
+-- This function implements the algorithm presented in Vladimir Batagelj, Matjaz
+-- Zaversnik: An O(m) Algorithm for Cores Decomposition of Networks.
+coreness :: Graph d a -> [(Double, a)]
+coreness g = unsafePerformIO $ do
+  v  <- newVector 0
+  _e <- withGraph g $ \gp ->
+        withVector v $ \vp ->
+          c_igraph_coreness
+            gp
+            vp
+            (getNeiMode g)
+  r  <- vectorToList v
+  return $ zip r (nodes g)
 
 --------------------------------------------------------------------------------
 -- 13.16 Topological sorting, directed acyclic graphs
 
+foreign import ccall "igraph_is_dag"
+  c_igraph_is_dag
+    :: GraphPtr
+    -> Ptr Bool
+    -> IO CInt
+
+-- | 16\.1\. `igraph_is_dag` — Checks whether a graph is a directed acyclic graph
+-- (DAG) or not.
+--
+-- A directed acyclic graph (DAG) is a directed graph with no cycles.
+isDAG :: Graph d a -> Bool
+isDAG g = unsafePerformIO $ alloca $ \bp -> do
+  _e <- withGraph g $ \gp ->
+          c_igraph_is_dag
+            gp
+            bp
+  peek bp
+
+foreign import ccall "igraph_topological_sorting"
+  c_igraph_topological_sorting
+    :: GraphPtr
+    -> VectorPtr
+    -> CInt
+    -> IO CInt
+
+-- | 16\.2\. `igraph_topological_sorting` — Calculate a possible topological sorting
+-- of the graph.
+--
+-- A topological sorting of a directed acyclic graph is a linear ordering of its
+-- nodes where each node comes before all nodes to which it has edges. Every DAG
+-- has at least one topological sort, and may have many. This function returns a
+-- possible topological sort among them. If the graph is not acyclic (it has at
+-- least one cycle), a partial topological sort is returned and a warning is
+-- issued.
+topologicalSorting
+  :: Graph d a
+  -> [a]
+topologicalSorting g = unsafePerformIO $ do
+  v  <- newVector 0
+  _e <- withGraph g $ \gp ->
+        withVector v $ \vp ->
+          c_igraph_topological_sorting
+            gp
+            vp
+            (getNeiMode g)
+  vectorToVertices g v
+
+foreign import ccall "igraph_feedback_arc_set"
+  c_igraph_feedback_arc_set
+    :: GraphPtr
+    -> VectorPtr
+    -> VectorPtr
+    -> CInt
+    -> IO CInt
+
+-- | 16.3. igraph_feedback_arc_set — Calculates a feedback arc set of the graph
+-- using different
+--
+-- A feedback arc set is a set of edges whose removal makes the graph acyclic.
+-- We are usually interested in minimum feedback arc sets, i.e. sets of edges
+-- whose total weight is minimal among all the feedback arc sets.
+--
+-- For undirected graphs, the problem is simple: one has to find a maximum
+-- weight spanning tree and then remove all the edges not in the spanning tree.
+-- For directed graphs, this is an NP-hard problem, and various heuristics are
+-- usually used to find an approximate solution to the problem. This function
+-- implements a few of these heuristics.
+feedbackArcSet
+  :: Graph d a
+  -> FASAlgorithm
+  -> [a]
+feedbackArcSet g algo = unsafePerformIO $ do
+  v  <- newVector 0
+  _e <- withGraph g $ \gp ->
+        withVector v $ \vp ->
+        withOptionalWeights g $ \wp ->
+          c_igraph_feedback_arc_set
+            gp
+            vp
+            wp
+            (fromIntegral $ fromEnum algo)
+  vectorToVertices g v
+
 --------------------------------------------------------------------------------
 -- 13.17 Maximum cardinality search, graph decomposition, chordal graphs
+
+foreign import ccall "igraph_maximum_cardinality_search"
+  c_igraph_maximum_cardinality_search
+    :: GraphPtr
+    -> VectorPtr
+    -> VectorPtr
+    -> IO CInt
+
+-- | 17\.1\. `igraph_maximum_cardinality_search` — Maximum cardinality search
+--
+-- This function implements the maximum cardinality search algorithm discussed
+-- in Robert E Tarjan and Mihalis Yannakakis: Simple linear-time algorithms to
+-- test chordality of graphs, test acyclicity of hypergraphs, and selectively
+-- reduce acyclic hypergraphs. SIAM Journal of Computation 13, 566--579, 1984.
+maximumCardinalitySearch
+  :: Graph d a
+  -> [(Int, a)]
+maximumCardinalitySearch g = unsafePerformIO $ do
+  v  <- newVector 0
+  _e <- withGraph g $ \gp ->
+        withVector v $ \vp ->
+          c_igraph_maximum_cardinality_search
+            gp
+            vp
+            nullPtr
+  r <- vectorToList v
+  return $ zip (map round r) (nodes g)
+
+foreign import ccall "igraph_is_chordal"
+  c_igraph_is_chordal
+    :: GraphPtr
+    -> VectorPtr
+    -> VectorPtr
+    -> Ptr Bool
+    -> VectorPtr
+    -> GraphPtr
+    -> IO CInt
+
+-- | 17\.2\. `igraph_is_chordal` — Decides whether a graph is chordal
+--
+-- A graph is chordal if each of its cycles of four or more nodes has a chord,
+-- which is an edge joining two nodes that are not adjacent in the cycle. An
+-- equivalent definition is that any chordless cycles have at most three nodes.
+isChordal
+  :: Graph d a
+  -> (Bool, [Edge d a]) -- ^ returns a list of fill-in edges to make the graph chordal
+isChordal g@(G _) = unsafePerformIO $ alloca $ \bp -> do
+  v  <- newVector 0
+  _e <- withGraph g $ \gp ->
+        withVector v $ \vp ->
+          c_igraph_is_chordal
+            gp
+            nullPtr
+            nullPtr
+            bp
+            vp
+            nullPtr
+  b  <- peek bp
+  as <- vectorToVertices g v
+  let mkEdges (f:t:r) = (toEdge f t : mkEdges r)
+      mkEdges []      = []
+      mkEdges [_]     = error "Error in `isChordal': Invalid number of arguments to `mkEdges'"
+  return (b, mkEdges as)
+
 
 --------------------------------------------------------------------------------
 -- 13.18 Matchings
