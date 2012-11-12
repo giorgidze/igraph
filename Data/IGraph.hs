@@ -51,8 +51,8 @@ module Data.IGraph
   , getAllShortestPaths, getAllShortestPathsDijkstra
   , averagePathLength
   , pathLengthHist
-  , diameter, diameter', diameter'', diameterDijkstra
-  , girth, girth'
+  , diameter, diameterDijkstra
+  , girth
   , eccentricity
   , radius
 
@@ -621,64 +621,30 @@ foreign import ccall "igraph_diameter"
 -- | 2\.13\. igraph_diameter — Calculates the diameter of a graph (longest
 -- geodesic).
 diameter :: Graph d a
-         -> Bool -- ^ directed?
-         -> Bool -- ^ unconnected?
-         -> Int
+         -> Bool
+         -> Bool
+         -> (Int, (a,a), [a]) -- ^ the diameter of the graph, the starting/end
+                              -- vertices and the longest path
 diameter g b1 b2 = unsafePerformIO $ do
-  alloca $ \ip -> do
-    _e <- withGraph g $ \gp ->
-      c_igraph_diameter
-        gp
-        ip
-        nullPtr
-        nullPtr
-        nullPtr
-        b1
-        b2
-    fromIntegral `fmap` peek ip
-
-diameter' :: Graph d a
-          -> Bool
-          -> Bool
-          -> (Int, (a,a)) -- ^ the diameter of the graph and the starting/end vertices
-diameter' g b1 b2 = unsafePerformIO $ do
   alloca $ \ip -> do
     alloca $ \fip -> do
       alloca $ \tip -> do
+        v  <- newVector 0
         _e <- withGraph g $ \gp ->
+              withVector v $ \vp ->
                 c_igraph_diameter
                   gp
                   ip
                   fip
                   tip
-                  nullPtr
+                  vp
                   b1
                   b2
         d  <- fromIntegral `fmap` peek ip
         fi <- fromIntegral `fmap` peek fip
         ti <- fromIntegral `fmap` peek tip
-        return (d, (idToNode'' g fi, idToNode'' g ti))
-
-diameter'' :: Graph d a
-           -> Bool
-           -> Bool
-           -> (Int, [a]) -- ^ the diameter of the graph and the actual longest path
-diameter'' g b1 b2 = unsafePerformIO $ do
-  alloca $ \ip -> do
-    v  <- newVector 0
-    _e <- withGraph g $ \gp ->
-            withVector v $ \vp ->
-              c_igraph_diameter
-                gp
-                ip
-                nullPtr
-                nullPtr
-                vp
-                b1
-                b2
-    d <- fromIntegral `fmap` peek ip
-    p <- vectorToVertices g v
-    return (d,p)
+        p  <- vectorToVertices g v
+        return (d, (idToNode'' g fi, idToNode'' g ti), p)
 
 foreign import ccall "igraph_diameter_dijkstra"
   c_igraph_diameter_dijkstra
@@ -718,19 +684,9 @@ foreign import ccall "igraph_girth"
 
 -- | 2\.15\. igraph_girth — The girth of a graph is the length of the shortest
 -- circle in it.
-girth :: Graph d a -> Int
+girth :: Graph d a
+      -> (Int, [a])  -- ^ girth with the shortest circle
 girth g = unsafePerformIO $ do
-  alloca $ \ip -> do
-    _e <- withGraph g $ \gp ->
-            c_igraph_girth
-              gp
-              ip
-              nullPtr
-    fromIntegral `fmap` peek ip
-
-girth' :: Graph d a
-       -> (Int, [a])  -- ^ girth with the actual shortest circle
-girth' g = unsafePerformIO $ do
   alloca $ \ip -> do
     v <- newVector 0
     _e <- withGraph g $ \gp ->
