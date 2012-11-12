@@ -2017,7 +2017,7 @@ foreign import ccall "igraph_assortativity_nominal"
     -> Bool
     -> IO CInt
 
--- | 14\\.1\. `igraph_assortativity_nominal` — Assortativity of a graph based on
+-- | 14\.1\. `igraph_assortativity_nominal` — Assortativity of a graph based on
 -- vertex categories
 --
 -- Assuming the vertices of the input graph belong to different categories, this
@@ -2210,7 +2210,7 @@ foreign import ccall "igraph_feedback_arc_set"
     -> CInt
     -> IO CInt
 
--- | 16.3. igraph_feedback_arc_set — Calculates a feedback arc set of the graph
+-- | 16\.3\. `igraph_feedback_arc_set` — Calculates a feedback arc set of the graph
 -- using different
 --
 -- A feedback arc set is a set of edges whose removal makes the graph acyclic.
