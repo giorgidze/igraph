@@ -84,6 +84,7 @@ module Data.IGraph
   , centralizationDegreeTMax
   , centralizationBetweennessTMax
   , centralizationClosenessTMax
+  , centralizationEigenvectorCentralityTMax
 
     -- ** 13\.8 Similarity Measures
   , bibCoupling
@@ -214,7 +215,7 @@ selectedEdges g es = unsafePerformIO $ do
 foreign import ccall "igraph_are_connected"
   c_igraph_are_connected :: GraphPtr -> CInt -> CInt -> Ptr CInt -> IO CInt
 
--- | 1\.1\. igraph_are_connected — Decides whether two vertices are connected
+-- | 1\.1\. `igraph_are_connected` — Decides whether two vertices are connected
 areConnected :: Graph d a -> a -> a -> Bool
 areConnected g n1 n2 = case (nodeToId g n1, nodeToId g n2) of
   (Just i1, Just i2) -> unsafePerformIO $ withGraph g $ \gp -> alloca $ \bp -> do
@@ -228,7 +229,7 @@ areConnected g n1 n2 = case (nodeToId g n1, nodeToId g n2) of
 foreign import ccall "shortest_paths"
   c_igraph_shortest_paths :: GraphPtr -> MatrixPtr -> VsPtr -> VsPtr -> CInt -> IO CInt
 
--- | 2\.1\. igraph_shortest_paths — The length of the shortest paths between
+-- | 2\.1\. `igraph_shortest_paths` — The length of the shortest paths between
 -- vertices.
 shortestPaths :: (Ord a, Hashable a)
               => Graph d a
@@ -263,8 +264,12 @@ foreign import ccall "shortest_paths_dijkstra"
   c_igraph_shortest_paths_dijkstra :: GraphPtr -> MatrixPtr -> VsPtr -> VsPtr
                                    -> VectorPtr -> CInt -> IO CInt
 
--- | 2\.2\. igraph_shortest_paths_dijkstra — Weighted shortest paths from some
+-- | 2\.2\. `igraph_shortest_paths_dijkstra` — Weighted shortest paths from some
 -- sources.
+--
+-- This function is Dijkstra's algorithm to find the weighted shortest paths to
+-- all vertices from a single source. (It is run independently for the given
+-- sources.) It uses a binary heap for efficient implementation.
 shortestPathsDijkstra :: (Ord a, Hashable a)
                       => Graph (Weighted d) a
                       -> VertexSelector a
@@ -297,8 +302,13 @@ foreign import ccall "shortest_paths_bellman_ford"
   c_igraph_shortest_paths_bellman_ford :: GraphPtr -> MatrixPtr -> VsPtr -> VsPtr -> VectorPtr
                                        -> CInt -> IO CInt
 
--- | 2\.3\. igraph_shortest_paths_bellman_ford — Weighted shortest paths from some
+-- | 2\.3\. `igraph_shortest_paths_bellman_ford` — Weighted shortest paths from some
 -- sources allowing negative weights.
+--
+-- This function is the Bellman-Ford algorithm to find the weighted shortest
+-- paths to all vertices from a single source. (It is run independently for the
+-- given sources.). If there are no negative weights, you are better off with
+-- igraph_shortest_paths_dijkstra() .
 shortestPathsBellmanFord :: (Ord a, Hashable a)
                          => Graph (Weighted d) a
                          -> VertexSelector a
@@ -331,8 +341,19 @@ foreign import ccall "shortest_paths_johnson"
   c_igraph_shortest_paths_johnson :: GraphPtr -> MatrixPtr -> VsPtr -> VsPtr -> VectorPtr
                                   -> IO CInt
 
--- | 2\.4\. igraph_shortest_paths_johnson — Calculate shortest paths from some
+-- | 2\.4\. `igraph_shortest_paths_johnson` — Calculate shortest paths from some
 -- sources using Johnson's algorithm.
+--
+-- See Wikipedia at http://en.wikipedia.org/wiki/Johnson's_algorithm for
+-- Johnson's algorithm. This algorithm works even if the graph contains negative
+-- edge weights, and it is worth using it if we calculate the shortest paths
+-- from many sources.
+--
+-- If no edge weights are supplied, then the unweighted version,
+-- igraph_shortest_paths() is called.
+--
+-- If all the supplied edge weights are non-negative, then Dijkstra's algorithm
+-- is used by calling igraph_shortest_paths_dijkstra().
 shortestPathsJohnson :: (Ord a, Hashable a)
                      => Graph (Weighted d) a
                      -> VertexSelector a
@@ -363,8 +384,11 @@ shortestPathsJohnson g vf vt =
 foreign import ccall "get_shortest_paths"
   c_igraph_get_shortest_paths :: GraphPtr -> VectorPtrPtr -> VectorPtrPtr -> CInt -> VsPtr -> CInt -> IO CInt
 
--- | 2\.5\. igraph_get_shortest_paths — Calculates the shortest paths from/to one
+-- | 2\.5\. `igraph_get_shortest_paths` — Calculates the shortest paths from/to one
 -- vertex.
+--
+-- If there is more than one geodesic between two vertices, this function gives
+-- only one of them.
 getShortestPaths :: Graph d a
                  -> a                     -- ^ from
                  -> VertexSelector a      -- ^ to
@@ -394,8 +418,15 @@ getShortestPaths g f vt =
 foreign import ccall "igraph_get_shortest_path"
   c_igraph_get_shortest_path :: GraphPtr -> VectorPtr -> VectorPtr -> CInt -> CInt -> CInt -> IO CInt
 
--- | 2\.6\. igraph_get_shortest_path — Shortest path from one vertex to another
+-- | 2\.6\. `igraph_get_shortest_path` — Shortest path from one vertex to another
 -- one.
+--
+-- Calculates and returns a single unweighted shortest path from a given vertex
+-- to another one. If there are more than one shortest paths between the two
+-- vertices, then an arbitrary one is returned.
+--
+-- This function is a wrapper to igraph_get_shortest_paths(), for the special
+-- case when only one target vertex is considered.
 getShortestPath :: Graph d a -> a -> a -> ([a],[Edge d a])
 getShortestPath g n1 n2 =
   let mi1 = nodeToId g n1
@@ -425,8 +456,11 @@ foreign import ccall "get_shortest_paths_dijkstra"
   c_igraph_get_shortest_paths_dijkstra :: GraphPtr -> VectorPtrPtr -> VectorPtrPtr
                                        -> CInt -> VsPtr -> VectorPtr -> CInt -> IO CInt
 
--- | 2\.7\. igraph_get_shortest_paths_dijkstra — Calculates the weighted
+-- | 2\.7\. `igraph_get_shortest_paths_dijkstra` — Calculates the weighted
 -- shortest paths from/to one vertex.
+--
+-- If there is more than one path with the smallest weight between two vertices,
+-- this function gives only one of them.
 getShortestPathsDijkstra :: Graph (Weighted d) a
                          -> a                     -- ^ from
                          -> VertexSelector a      -- ^ to
@@ -459,8 +493,14 @@ foreign import ccall "igraph_get_shortest_path_dijkstra"
   c_igraph_get_shortest_path_dijkstra :: GraphPtr -> VectorPtr -> VectorPtr -> CInt
                                       -> CInt -> VectorPtr -> CInt -> IO CInt
 
--- | 2\.8\. igraph_get_shortest_path_dijkstra — Weighted shortest path from one
+-- | 2\.8\. `igraph_get_shortest_path_dijkstra` — Weighted shortest path from one
 -- vertex to another one.
+--
+-- Calculates a single (positively) weighted shortest path from a single vertex
+-- to another one, using Dijkstra's algorithm.
+--
+-- This function is a special case (and a wrapper) to
+-- igraph_get_shortest_paths_dijkstra().
 getShortestPathDijkstra :: Graph (Weighted d) a -> a -> a -> ([a],[Edge (Weighted d) a])
 getShortestPathDijkstra g n1 n2 =
   let mi1 = nodeToId g n1
@@ -498,7 +538,7 @@ foreign import ccall "get_all_shortest_paths"
                                   -> CInt
                                   -> IO CInt
 
--- | 2\.9\. igraph_get_all_shortest_paths — Finds all shortest paths (geodesics)
+-- | 2\.9\. `igraph_get_all_shortest_paths` — Finds all shortest paths (geodesics)
 -- from a vertex to all other vertices.
 getAllShortestPaths :: Graph d a
                     -> a                  -- ^ from
@@ -533,7 +573,7 @@ foreign import ccall "get_all_shortest_paths_dijkstra"
                                            -> CInt
                                            -> IO CInt
 
--- | 2\.10\. igraph_get_all_shortest_paths_dijkstra — Finds all shortest paths
+-- | 2\.10\. `igraph_get_all_shortest_paths_dijkstra` — Finds all shortest paths
 -- (geodesics) from a vertex to all other vertices.
 getAllShortestPathsDijkstra :: Graph (Weighted d) a
                             -> a                  -- ^ from
@@ -563,7 +603,7 @@ getAllShortestPathsDijkstra g f vt =
 foreign import ccall "igraph_average_path_length"
   c_igraph_average_path_length :: GraphPtr -> Ptr CDouble -> Bool -> Bool -> IO CInt
 
--- | 2\.11\. igraph_average_path_length — Calculates the average geodesic length
+-- | 2\.11\. `igraph_average_path_length` — Calculates the average geodesic length
 -- in a graph.
 averagePathLength :: Graph d a
                   -> Bool     -- ^ Boolean, whether to consider directed paths. Ignored for undirected graphs.
@@ -588,7 +628,11 @@ averagePathLength g b1 b2 = unsafePerformIO $ do
 foreign import ccall "igraph_path_length_hist"
   c_igraph_path_length_hist :: GraphPtr -> VectorPtr -> Ptr CDouble -> Bool -> IO CInt
 
--- | 2\.12\. igraph_path_length_hist — Create a histogram of all shortest path lengths.
+-- | 2\.12\. `igraph_path_length_hist` — Create a histogram of all shortest path lengths.
+--
+-- This function calculates a histogram, by calculating the shortest path length
+-- between each pair of vertices. For directed graphs both directions might be
+-- considered and then every pair of vertices appears twice in the histogram.
 pathLengthHist :: Graph d a
                -> Bool  -- ^ Whether to consider directed paths in a directed
                        -- graph (if not zero). This argument is ignored for
@@ -618,7 +662,7 @@ foreign import ccall "igraph_diameter"
                     -> Bool
                     -> IO CInt
 
--- | 2\.13\. igraph_diameter — Calculates the diameter of a graph (longest
+-- | 2\.13\. `igraph_diameter` — Calculates the diameter of a graph (longest
 -- geodesic).
 diameter :: Graph d a
          -> Bool
@@ -651,8 +695,12 @@ foreign import ccall "igraph_diameter_dijkstra"
     :: GraphPtr -> VectorPtr -> Ptr CDouble -> Ptr CInt -> Ptr CInt -> VectorPtr
     -> Bool -> Bool -> IO CInt
 
--- | 2\.14\. igraph_diameter_dijkstra — Weighted diameter using Dijkstra's
+-- | 2\.14\. `igraph_diameter_dijkstra` — Weighted diameter using Dijkstra's
 -- algorithm, non-negative weights only.
+--
+-- The diameter of a graph is its longest geodesic. I.e. the (weighted) shortest
+-- path is calculated for all pairs of vertices and the longest one is the
+-- diameter.
 diameterDijkstra :: Graph d a
                  -> (Double, a, a, [a]) -- ^ (diameter, source vertex, target vertex, path)
 diameterDijkstra g@(G _) = unsafePerformIO $
@@ -682,8 +730,18 @@ diameterDijkstra g@(G _) = unsafePerformIO $
 foreign import ccall "igraph_girth"
   c_igraph_girth :: GraphPtr -> Ptr CInt -> VectorPtr -> IO CInt
 
--- | 2\.15\. igraph_girth — The girth of a graph is the length of the shortest
+-- | 2\.15\. `igraph_girth` — The girth of a graph is the length of the shortest
 -- circle in it.
+--
+-- The current implementation works for undirected graphs only, directed graphs
+-- are treated as undirected graphs. Loop edges and multiple edges are ignored.
+--
+-- If the graph is a forest (ie. acyclic), then zero is returned.
+--
+-- This implementation is based on Alon Itai and Michael Rodeh: Finding a
+-- minimum circuit in a graph Proceedings of the ninth annual ACM symposium on
+-- Theory of computing , 1-10, 1977. The first implementation of this function
+-- was done by Keith Briggs, thanks Keith.
 girth :: Graph d a
       -> (Int, [a])  -- ^ girth with the shortest circle
 girth g = unsafePerformIO $ do
@@ -702,7 +760,14 @@ girth g = unsafePerformIO $ do
 foreign import ccall "eccentricity"
   c_igraph_eccentricity :: GraphPtr -> VectorPtr -> VsPtr -> CInt -> IO CInt
 
--- | 2\.16\. igraph_eccentricity — Eccentricity of some vertices
+-- | 2\.16\. `igraph_eccentricity` — Eccentricity of some vertices
+--
+-- The eccentricity of a vertex is calculated by measuring the shortest distance
+-- from (or to) the vertex, to (or from) all vertices in the graph, and taking
+-- the maximum.
+--
+-- This implementation ignores vertex pairs that are in different components.
+-- Isolated vertices have eccentricity zero.
 eccentricity :: Graph d a -> VertexSelector a -> [(a,Int)]
 eccentricity g vs = unsafePerformIO $ do
   v  <- newVector 0
@@ -720,7 +785,10 @@ eccentricity g vs = unsafePerformIO $ do
 foreign import ccall "igraph_radius"
   c_igraph_radius :: GraphPtr -> Ptr CDouble -> CInt -> IO CInt
 
--- | 2\.17\. igraph_radius — Radius of a graph
+-- | 2\.17\. `igraph_radius` — Radius of a graph
+--
+-- The radius of a graph is the defined as the minimum eccentricity of its
+-- vertices, see igraph_eccentricity().
 radius :: Graph d a -> Int
 radius g = unsafePerformIO $ do
   alloca $ \dp -> do
@@ -747,12 +815,6 @@ radius g = unsafePerformIO $ do
 
 3.2. igraph_neighborhood — Calculate the neighborhood of vertices.
 
-  DONE:
-
--}
-
-{-
-
 foreign import ccall "neighborhood"
   c_igraph_neighborhood :: GraphPtr d a -> VectorPtrPtr -> VsPtr -> CInt -> CInt -> IO CInt
 
@@ -763,10 +825,6 @@ neighborhood vs o = runUnsafeIO $ \g -> do
     c_igraph_neighborhood gp vp vsp (fromIntegral o) (getNeiMode g)
   ids      <- vectorPtrToList v
   return (map (map (idToNode'' g . round)) ids, g')
-
--}
-
-{-
 
 3.3. igraph_neighborhood_graphs — Create graphs from the neighborhood(s) of some vertex/vertices.
 
@@ -783,7 +841,7 @@ neighborhood vs o = runUnsafeIO $ \g -> do
 foreign import ccall "igraph_subcomponent"
   c_igraph_subcomponent :: GraphPtr -> VectorPtr -> CDouble -> CInt -> IO CInt
 
--- | 4\.1\. igraph_subcomponent — The vertices in the same component as a given vertex.
+-- | 4\.1\. `igraph_subcomponent` — The vertices in the same component as a given vertex.
 subcomponent :: Graph d a -> a -> [a]
 subcomponent g a = case nodeToId g a of
   Just i -> unsafePerformIO $ do
@@ -850,7 +908,7 @@ subgraph vs = do
 foreign import ccall "igraph_is_connected"
   c_igraph_is_connected :: GraphPtr -> Ptr CInt -> CInt -> IO CInt
 
--- | 4\.6\. igraph_is_connected — Decides whether the graph is (weakly or strongly) connected.
+-- | 4\.6\. `igraph_is_connected` — Decides whether the graph is (weakly or strongly) connected.
 isConnected :: Graph d a -> Connectedness -> Bool
 isConnected g c = unsafePerformIO $ withGraph g $ \gp -> alloca $ \b -> do
   _ <- c_igraph_is_connected gp b (fromIntegral $ fromEnum c)
@@ -896,8 +954,11 @@ necessary? no.
 foreign import ccall "igraph_articulation_points"
   c_igraph_articulation_points :: GraphPtr -> VectorPtr -> IO CInt
 
--- | 4\.10\. igraph_articulation_points — Find the articulation points in a
+-- | 4\.10\. `igraph_articulation_points` — Find the articulation points in a
 -- graph.
+--
+-- A vertex is an articulation point if its removal increases the number of
+-- connected components in the graph.
 articulationPoints :: Graph d a -> [a]
 articulationPoints g = unsafePerformIO $ do
   v  <- newVector 0
@@ -915,8 +976,18 @@ articulationPoints g = unsafePerformIO $ do
 foreign import ccall "closeness"
   c_igraph_closeness :: GraphPtr -> VectorPtr -> VsPtr -> CInt -> VectorPtr -> IO CInt
 
--- | 5\.1\. igraph_closeness — Closeness centrality calculations for some
+-- | 5\.1\. `igraph_closeness` — Closeness centrality calculations for some
 -- vertices.
+--
+-- The closeness centrality of a vertex measures how easily other vertices can
+-- be reached from it (or the other way: how easily it can be reached from the
+-- other vertices). It is defined as the number of the number of vertices minus
+-- one divided by the sum of the lengths of all geodesics from/to the given
+-- vertex.
+--
+-- If the graph is not connected, and there is no path between two vertices, the
+-- number of vertices is used instead the length of the geodesic. This is always
+-- longer than the longest possible geodesic.
 closeness :: Ord a => Graph d a -> VertexSelector a -> Map a Double
 closeness g vs = unsafePerformIO $ do
   v  <- newVector 0
@@ -936,7 +1007,11 @@ closeness g vs = unsafePerformIO $ do
 foreign import ccall "betweenness"
   c_igraph_betweenness :: GraphPtr -> VectorPtr -> VsPtr -> Bool -> VectorPtr -> Bool -> IO CInt
 
--- | 5\.2\. igraph_betweenness — Betweenness centrality of some vertices.
+-- | 5\.2\. `igraph_betweenness` — Betweenness centrality of some vertices.
+--
+-- The betweenness centrality of a vertex is the number of geodesics going
+-- through it. If there are more than one geodesic between two vertices, the
+-- value of these geodesics are weighted by one over the number of geodesics.
 betweenness :: Ord a => Graph d a -> VertexSelector a -> Map a Double
 betweenness g vs = unsafePerformIO $ do
   v  <- newVector 0
@@ -957,7 +1032,11 @@ betweenness g vs = unsafePerformIO $ do
 foreign import ccall "igraph_edge_betweenness"
   c_igraph_edge_betweenness :: GraphPtr -> VectorPtr -> Bool -> VectorPtr -> IO CInt
 
--- | 5\.3\. igraph_edge_betweenness — Betweenness centrality of the edges.
+-- | 5\.3\. `igraph_edge_betweenness` — Betweenness centrality of the edges.
+--
+-- The betweenness centrality of an edge is the number of geodesics going
+-- through it. If there are more than one geodesics between two vertices, the
+-- value of these geodesics are weighted by one over the number of geodesics.
 edgeBetweenness :: Ord (Edge d a) => Graph d a -> Map (Edge d a) Double
 edgeBetweenness g = unsafePerformIO $ do
   v  <- newVector 0
@@ -1013,7 +1092,29 @@ edgeBetweenness g = unsafePerformIO $ do
 foreign import ccall "constraint"
   c_igraph_constraint :: GraphPtr -> VectorPtr -> VsPtr -> VectorPtr -> IO CInt
 
--- | 5\.8\. igraph_constraint — Burt's constraint scores.
+-- | 5\.8\. `igraph_constraint` — Burt's constraint scores.
+--
+-- This function calculates Burt's constraint scores for the given vertices,
+-- also known as structural holes.
+--
+-- Burt's constraint is higher if ego has less, or mutually stronger related
+-- (i.e. more redundant) contacts. Burt's measure of constraint, C[i], of vertex
+-- i's ego network V[i], is defined for directed and valued graphs,
+--
+--     C[i] = sum( sum( (p[i,q] p[q,j])^2, q in V[i], q != i,j ), j in V[], j != i)
+--
+-- for a graph of order (ie. number of vertices) N, where proportional tie
+-- strengths are defined as
+--
+--     p[i,j]=(a[i,j]+a[j,i]) / sum(a[i,k]+a[k,i], k in V[i], k != i),
+--
+-- a[i,j] are elements of A and the latter being the graph adjacency matrix. For
+-- isolated vertices, constraint is undefined.
+--
+-- Burt, R.S. (2004). Structural holes and good ideas. American Journal of
+-- Sociology 110, 349-399.
+--
+-- The first R version of this function was contributed by Jeroen Bruggeman.
 constraint :: Ord a => Graph d a -> VertexSelector a -> Map a Double
 constraint g vs = unsafePerformIO $ do
   v  <- newVector 0
@@ -1032,8 +1133,11 @@ constraint g vs = unsafePerformIO $ do
 foreign import ccall "maxdegree"
   c_igraph_maxdegree :: GraphPtr -> Ptr CInt -> VsPtr -> CInt -> Bool -> IO CInt
 
--- | 5\.9\. igraph_maxdegree — Calculate the maximum degree in a graph (or set
+-- | 5\.9\. `igraph_maxdegree` — Calculate the maximum degree in a graph (or set
 -- of vertices).
+--
+-- The largest in-, out- or total degree of the specified vertices is
+-- calculated.
 maxdegree :: Graph d a
           -> VertexSelector a
           -> Bool -- ^ count self-loops?
@@ -1053,8 +1157,12 @@ maxdegree g vs b = unsafePerformIO $
 foreign import ccall "strength"
   c_igraph_strength :: GraphPtr -> VectorPtr -> VsPtr -> CInt -> Bool -> VectorPtr -> IO CInt
 
--- | 5\.10\. igraph_strength — Strength of the vertices, weighted vertex degree
+-- | 5\.10\. `igraph_strength` — Strength of the vertices, weighted vertex degree
 -- in other words.
+--
+-- In a weighted network the strength of a vertex is the sum of the weights of
+-- all incident edges. In a non-weighted network this is exactly the vertex
+-- degree.
 strength :: Ord a
          => Graph d a
          -> VertexSelector a
@@ -1108,8 +1216,23 @@ strength g vs b = unsafePerformIO $ do
 foreign import ccall "closeness_estimate"
   c_igraph_closeness_estimate :: GraphPtr -> VectorPtr -> VsPtr -> CInt -> CDouble -> VectorPtr -> IO CInt
 
--- | 6\.1\. igraph_closeness_estimate — Closeness centrality estimations for
+-- | 6\.1\. `igraph_closeness_estimate` — Closeness centrality estimations for
 -- some vertices.
+--
+-- The closeness centrality of a vertex measures how easily other vertices can
+-- be reached from it (or the other way: how easily it can be reached from the
+-- other vertices). It is defined as the number of the number of vertices minus
+-- one divided by the sum of the lengths of all geodesics from/to the given
+-- vertex. When estimating closeness centrality, igraph considers paths having a
+-- length less than or equal to a prescribed cutoff value.
+--
+-- If the graph is not connected, and there is no such path between two
+-- vertices, the number of vertices is used instead the length of the geodesic.
+-- This is always longer than the longest possible geodesic.
+--
+-- Since the estimation considers vertex pairs with a distance greater than the
+-- given value as disconnected, the resulting estimation will always be lower
+-- than the actual closeness centrality.
 closenessEstimate :: Ord a => Graph d a
                   -> VertexSelector a
                   -> Int  -- ^ cutoff
@@ -1134,8 +1257,15 @@ foreign import ccall "betweenness_estimate"
   c_igraph_betweenness_estimate :: GraphPtr -> VectorPtr -> VsPtr -> Bool -> CDouble
                                 -> VectorPtr -> Bool -> IO CInt
 
--- | 6\.2\. igraph_betweenness_estimate — Estimated betweenness centrality of
+-- | 6\.2\. `igraph_betweenness_estimate` — Estimated betweenness centrality of
 -- some vertices.
+--
+-- The betweenness centrality of a vertex is the number of geodesics going
+-- through it. If there are more than one geodesic between two vertices, the
+-- value of these geodesics are weighted by one over the number of geodesics.
+-- When estimating betweenness centrality, igraph takes into consideration only
+-- those paths that are shorter than or equal to a prescribed length. Note that
+-- the estimated centrality will always be less than the real one.
 betweennessEstimate :: Ord a
                     => Graph d a
                     -> VertexSelector a
@@ -1161,8 +1291,14 @@ betweennessEstimate g@(G _) vs cutoff = unsafePerformIO $ do
 foreign import ccall "igraph_edge_betweenness_estimate"
   c_igraph_edge_betweenness_estimate :: GraphPtr -> VectorPtr -> Bool -> CDouble -> VectorPtr -> IO CInt
 
--- | 6\.3\. igraph_edge_betweenness_estimate — Estimated betweenness centrality
+-- | 6\.3\. `igraph_edge_betweenness_estimate` — Estimated betweenness centrality
 -- of the edges.
+--
+-- The betweenness centrality of an edge is the number of geodesics going
+-- through it. If there are more than one geodesics between two vertices, the
+-- value of these geodesics are weighted by one over the number of geodesics.
+-- When estimating betweenness centrality, igraph takes into consideration only
+-- those paths that are shorter than or equal to a prescribed length. Note that
 edgeBetweennessEstimate :: Ord (Edge d a)
                         => Graph d a
                         -> Int -- ^ cutoff
@@ -1196,8 +1332,12 @@ foreign import ccall "igraph_centralization_degree"
   c_igraph_centralization_degree :: GraphPtr -> VectorPtr -> CInt -> Bool
                                  -> Ptr CDouble -> Ptr CDouble -> Bool -> IO CInt
 
--- | 7\.2\. igraph_centralization_degree — Calculate vertex degree and graph
+-- | 7\.2\. `igraph_centralization_degree` — Calculate vertex degree and graph
 -- centralization
+--
+-- This function calculates the degree of the vertices by passing its arguments
+-- to igraph_degree(); and it calculates the graph level centralization index
+-- based on the results by calling igraph_centralization().
 centralizationDegree :: Ord a => Graph d a
                      -> Bool -- ^ consider loop edges?
                      -> Bool -- ^ normalize centralization score?
@@ -1227,8 +1367,13 @@ foreign import ccall "igraph_centralization_betweenness"
   c_igraph_centralization_betweenness :: GraphPtr -> VectorPtr -> Bool -> Bool
                                       -> Ptr CDouble -> Ptr CDouble -> Bool -> IO CInt
 
--- | 7\.3\. igraph_centralization_betweenness — Calculate vertex betweenness and
+-- | 7\.3\. `igraph_centralization_betweenness` — Calculate vertex betweenness and
 -- graph centralization
+--
+-- This function calculates the betweenness centrality of the vertices by
+-- passing its arguments to igraph_betweenness(); and it calculates the graph
+-- level centralization index based on the results by calling
+-- igraph_centralization().
 centralizationBetweenness :: Ord a => Graph d a
                           -> Bool -- ^ normalize centralization score?
                           -> (Map a Double, Double, Double) -- ^ (node-level degree scores, centralization scores, theoretical max)
@@ -1256,8 +1401,12 @@ foreign import ccall "igraph_centralization_closeness"
   c_igraph_centralization_closeness
     :: GraphPtr -> VectorPtr -> CInt -> Ptr CDouble -> Ptr CDouble -> Bool -> IO CInt
 
--- | 7\.4\. igraph_centralization_closeness — Calculate vertex closeness and
+-- | 7\.4\. `igraph_centralization_closeness` — Calculate vertex closeness and
 -- graph centralization
+--
+-- This function calculates the closeness centrality of the vertices by passing
+-- its arguments to igraph_closeness(); and it calculates the graph level
+-- centralization index based on the results by calling igraph_centralization().
 centralizationCloseness :: Ord a => Graph d a
                         -> Bool -- ^ normalize centralization score?
                         -> (Map a Double, Double, Double) -- ^ (node-level degree scores, centralization scores, theoretical max)
@@ -1298,8 +1447,23 @@ foreign import ccall "igraph_centralization_degree_tmax"
   c_igraph_centralization_degree_tmax
     :: GraphPtr -> CInt -> CInt -> Bool -> Ptr CDouble -> IO CInt
 
--- | 7\.6\. igraph_centralization_degree_tmax — Theoretical maximum for graph
+-- | 7\.6\. `igraph_centralization_degree_tmax` — Theoretical maximum for graph
 -- centralization based on degree
+--
+-- This function returns the theoretical maximum graph centrality based on
+-- vertex degree.
+--
+-- There are two ways to call this function, the first is to supply a graph as
+-- the graph argument, and then the number of vertices is taken from this
+-- object, and its directedness is considered as well. The nodes argument is
+-- ignored in this case. The mode argument is also ignored if the supplied graph
+-- is undirected.
+--
+-- The other way is to supply a null pointer as the graph argument. In this case
+-- the nodes and mode arguments are considered.
+--
+-- The most centralized structure is the star. More specifically, for undirected
+-- graphs it is the star, for directed graphs it is the in-star or the out-star.
 centralizationDegreeTMax :: Either (Graph d a) Int -- ^ either graph or number of nodes
                          -> Bool -- ^ consider loop edges?
                          -> Double
@@ -1324,8 +1488,22 @@ foreign import ccall "igraph_centralization_betweenness_tmax"
   c_igraph_centralization_betweenness_tmax
     :: GraphPtr -> CInt -> Bool -> Ptr CDouble -> IO CInt
 
--- | 7\.7\. igraph_centralization_betweenness_tmax — Theoretical maximum for
+-- | 7\.7\. `igraph_centralization_betweenness_tmax` — Theoretical maximum for
 -- graph centralization based on betweenness
+--
+-- This function returns the theoretical maximum graph centrality based on
+-- vertex betweenness.
+--
+-- There are two ways to call this function, the first is to supply a graph as
+-- the graph argument, and then the number of vertices is taken from this
+-- object, and its directedness is considered as well. The nodes argument is
+-- ignored in this case. The directed argument is also ignored if the supplied
+-- graph is undirected.
+--
+-- The other way is to supply a null pointer as the graph argument. In this case
+-- the nodes and directed arguments are considered.
+--
+-- The most centralized structure is the star.
 centralizationBetweennessTMax :: Either (Graph d a) Int
                               -> Double
 centralizationBetweennessTMax egi = unsafePerformIO $
@@ -1348,8 +1526,22 @@ foreign import ccall "igraph_centralization_closeness_tmax"
   c_igraph_centralization_closeness_tmax
     :: GraphPtr -> CInt -> CInt -> Ptr CDouble -> IO CInt
 
--- | 7\.8\. igraph_centralization_closeness_tmax — Theoretical maximum for graph
+-- | 7\.8\. `igraph_centralization_closeness_tmax` — Theoretical maximum for graph
 -- centralization based on closeness
+--
+-- This function returns the theoretical maximum graph centrality based on
+-- vertex closeness.
+--
+-- There are two ways to call this function, the first is to supply a graph as
+-- the graph argument, and then the number of vertices is taken from this
+-- object, and its directedness is considered as well. The nodes argument is
+-- ignored in this case. The mode argument is also ignored if the supplied graph
+-- is undirected.
+--
+-- The other way is to supply a null pointer as the graph argument. In this case
+-- the nodes and mode arguments are considered.
+--
+-- The most centralized structure is the star.
 centralizationClosenessTMax :: Either (Graph d a) Int -> Double
 centralizationClosenessTMax egi = unsafePerformIO $
   alloca $ \rp -> do
@@ -1367,15 +1559,51 @@ centralizationClosenessTMax egi = unsafePerformIO $
   i       = either (const 0) fromIntegral egi
   neimode = either getNeiMode (const (fromIntegral (fromEnum Out))) egi
 
-{-
-7.9. igraph_centralization_eigenvector_centrality_tmax — Theoretical maximum centralization for eigenvector centrality
+foreign import ccall "igraph_centralization_eigenvector_centrality_tmax"
+  c_igraph_centralization_eigenvector_centrality_tmax
+    :: GraphPtr
+    -> CInt
+    -> Bool
+    -> Bool
+    -> Ptr CDouble
+    -> IO CInt
 
-  int igraph_centralization_eigenvector_centrality_tmax(const igraph_t *graph,
-                                                        igraph_integer_t nodes,
-                                                        igraph_bool_t directed,
-                                                        igraph_bool_t scale, 
-                                                        igraph_real_t *res);
--}
+-- | 7\.9\. `igraph_centralization_eigenvector_centrality_tmax` — Theoretical
+-- maximum centralization for eigenvector centrality
+--
+-- This function returns the theoretical maximum graph centrality based on
+-- vertex eigenvector centrality.
+--
+-- There are two ways to call this function, the first is to supply a graph as
+-- the graph argument, and then the number of vertices is taken from this
+-- object, and its directedness is considered as well. The nodes argument is
+-- ignored in this case. The directed argument is also ignored if the supplied
+-- graph is undirected.
+--
+-- The other way is to supply a null pointer as the graph argument. In this case
+-- the nodes and directed arguments are considered.
+--
+-- The most centralized directed structure is the in-star. The most centralized
+-- undirected structure is the graph with a single edge.
+centralizationEigenvectorCentralityTMax
+  :: Either (Graph d a) Int
+  -> Bool -- ^ Whether to consider edge directions. This argument is ignored if
+          -- graph is not a null pointer and it is undirected
+  -> Bool -- ^ Whether to rescale the node-level centrality scores to have a maximum of one
+  -> Double
+centralizationEigenvectorCentralityTMax egi dir sc = unsafePerformIO $ alloca $ \dp -> do
+  _e <- withGraph' egi $ \gp ->
+          c_igraph_centralization_eigenvector_centrality_tmax
+            gp
+            i
+            dir
+            sc
+            dp
+  realToFrac `fmap` peek dp
+ where
+  withGraph' (Left g)  = withGraph g
+  withGraph' (Right _) = (\f -> f nullPtr)
+  i = either (const 0) fromIntegral egi
 
 --------------------------------------------------------------------------------
 -- 13.8 Similarity Measures
