@@ -63,7 +63,7 @@ module Data.IGraph
   , subgraphEdges
   --, subgraph
   , isConnected
-  -- , decompose
+  , decompose
   , Connectedness(..)
   , articulationPoints
 
@@ -71,10 +71,14 @@ module Data.IGraph
   , closeness
   , betweenness, edgeBetweenness
   , pagerank
-  -- more
+  , personalizedPagerank
+  , personalizedPagerankVs
   , constraint
   , maxdegree
   , strength
+  , eigenvectorCentrality
+  , hubScore
+  , authorityScore
 
     -- ** 13\.6 Estimating Centrality Measures
   , closenessEstimate
@@ -85,6 +89,7 @@ module Data.IGraph
   , centralizationDegree
   , centralizationBetweenness
   , centralizationCloseness
+  , centralizationEigenvectorCentrality
   , centralizationDegreeTMax
   , centralizationBetweennessTMax
   , centralizationClosenessTMax
@@ -103,6 +108,8 @@ module Data.IGraph
 
     -- ** 13\.9 Spanning Tress
   , minimumSpanningTree
+  , minimumSpanningTreeUnweighted
+  , minimumSpanningTreePrim
 
     -- ** 13\.10 Transitivity or Clustering Coefficient
   , transitivityUndirected
@@ -936,33 +943,46 @@ isConnected g c = unsafePerformIO $ withGraph g $ \gp -> alloca $ \b -> do
   r <- peek b
   return $ r == 1
 
-{-
-
-4.7. igraph_decompose — Decompose a graph into connected components.
+-- | 4.7. igraph_decompose — Decompose a graph into connected components.
 
 foreign import ccall "igraph_decompose"
-  c_igraph_decompose :: GraphPtr -> VectorPtrPtr -> CInt -> CLong -> CInt -> IO CInt
+  c_igraph_decompose
+    :: GraphPtr
+    -> GraphVecPtr
+    -> CInt
+    -> CLong
+    -> CInt
+    -> IO CInt
 
-decompose :: Graph d a -> Connectedness -> Int -> Int -> [Graph d a]
+decompose
+  :: Graph d a
+  -> Connectedness
+  -> Int
+  -> Int
+  -> [Graph d a]
 decompose g m ma mi = unsafePerformIO $ do
-  vp <- newVectorPtr 0
-  _e <- withGraph g $ \gp ->
-        withVectorPtr vp $ \vpp ->
-          c_igraph_decompose
-            gp
-            vpp
-            (fromIntegral $ fromEnum m)
-            (fromIntegral ma)
-            (fromIntegral mi)
-  -- vectorPtrToVertices g vp -- wrong since the vectorptr contains graphs!
+  gvp <- newGraphVector 0
+  _e  <- withGraph g $ \gp ->
+         withGraphVector gvp $ \gvpp -> do
+           setVertexIds gp
+           c_igraph_decompose
+             gp
+             gvpp
+             (fromIntegral $ fromEnum m)
+             (fromIntegral ma)
+             (fromIntegral mi)
+  graphVectorToSubgraphs gvp g
 
+{-
 4.8. igraph_decompose_destroy — Free the memory allocated by igraph_decompose().
 
   void igraph_decompose_destroy(igraph_vector_ptr_t *complist);
 
-necessary? no.
+necessary? no. -> foreign pointers!
+-}
 
-4.9. igraph_biconnected_components — Calculate biconnected components
+{-
+-- | 4\.9\. `igraph_biconnected_components` — Calculate biconnected components
 
   int igraph_biconnected_components(const igraph_t *graph,
                                     igraph_integer_t *no,
@@ -970,6 +990,12 @@ necessary? no.
                                     igraph_vector_ptr_t *component_edges,
                                     igraph_vector_ptr_t *components,
                                     igraph_vector_t *articulation_points);
+
+foreign import ccall "igraph_biconnected_components"
+  c_igraph_biconnected_components
+    :: GraphPtr
+    -> Ptr CInt
+    -> 
 -}
 
 foreign import ccall "igraph_articulation_points"
@@ -1117,25 +1143,91 @@ pagerank g vs d = unsafePerformIO $ alloca $ \dp -> do
                           const igraph_vs_t vids, igraph_bool_t directed,
                           igraph_integer_t niter, igraph_real_t eps, 
                           igraph_real_t damping, igraph_bool_t old);
-
-5.6. igraph_personalized_pagerank — Calculates the personalized Google PageRank for the specified vertices.
-
-  int igraph_personalized_pagerank(const igraph_t *graph, igraph_vector_t *vector,
-                                   igraph_real_t *value, const igraph_vs_t vids,
-                                   igraph_bool_t directed, igraph_real_t damping, 
-                                   igraph_vector_t *reset,
-                                   const igraph_vector_t *weights,
-                                   igraph_arpack_options_t *options);
-
-5.7. igraph_personalized_pagerank_vs — Calculates the personalized Google PageRank for the specified vertices.
-
-  int igraph_personalized_pagerank_vs(const igraph_t *graph, igraph_vector_t *vector,
-                                      igraph_real_t *value, const igraph_vs_t vids,
-                                      igraph_bool_t directed, igraph_real_t damping, 
-                                      igraph_vs_t reset_vids,
-                                      const igraph_vector_t *weights,
-                                      igraph_arpack_options_t *options);
 -}
+
+foreign import ccall "personalized_pagerank"
+  c_igraph_personalized_pagerank
+    :: GraphPtr
+    -> VectorPtr
+    -> Ptr CDouble
+    -> VsPtr
+    -> Bool
+    -> CDouble
+    -> VectorPtr
+    -> VectorPtr
+    -> ArpackPtr
+    -> IO CInt
+
+-- | 5\.6\. `igraph_personalized_pagerank` — Calculates the personalized Google PageRank for the specified vertices.
+personalizedPagerank
+  :: Graph d a
+  -> VertexSelector a
+  -> Double -- ^ The damping factor ("d" in the original paper)
+  -> (Double, [(a, Double)])
+personalizedPagerank g vs d = unsafePerformIO $ alloca $ \dp -> do
+  v  <- newVector 0
+  _e <- withGraph g $ \gp ->
+        withVector v $ \vp ->
+        withVs vs g $ \vsp ->
+        withOptionalWeights g $ \wp ->
+        withArpack g $ \ ap ->
+          c_igraph_personalized_pagerank
+            gp
+            vp
+            dp
+            vsp
+            True
+            (realToFrac d)
+            nullPtr
+            wp
+            ap
+  res <- peek dp
+  lis <- vectorToList v
+  return (realToFrac res, zip (nodes g) lis)
+
+foreign import ccall "personalized_pagerank_vs"
+  c_igraph_personalized_pagerank_vs
+    :: GraphPtr
+    -> VectorPtr
+    -> Ptr CDouble
+    -> VsPtr
+    -> Bool
+    -> CDouble
+    -> VsPtr
+    -> VectorPtr
+    -> ArpackPtr
+    -> IO CInt
+
+-- | 5\.7\. `igraph_personalized_pagerank_vs` — Calculates the personalized
+-- Google PageRank for the specified vertices.
+personalizedPagerankVs
+  :: Graph d a
+  -> VertexSelector a
+  -> Double -- ^ The damping factor ("d" in the original paper)
+  -> VertexSelector a -- ^ IDs of the vertices used when resetting the random
+                      -- walk.
+  -> (Double, [(a, Double)])
+personalizedPagerankVs g vs d reset = unsafePerformIO $ alloca $ \dp -> do
+  v  <- newVector 0
+  _e <- withGraph g $ \gp ->
+        withVector v $ \vp ->
+        withVs vs g $ \vsp ->
+        withVs reset g $ \resetp ->
+        withOptionalWeights g $ \wp ->
+        withArpack g $ \ap ->
+          c_igraph_personalized_pagerank_vs
+            gp
+            vp
+            dp
+            vsp
+            True
+            (realToFrac d)
+            resetp
+            wp
+            ap
+  res <- peek dp
+  lis <- vectorToList v
+  return (realToFrac res, zip (nodes g) lis)
 
 foreign import ccall "constraint"
   c_igraph_constraint :: GraphPtr -> VectorPtr -> VsPtr -> VectorPtr -> IO CInt
@@ -1232,31 +1324,107 @@ strength g vs b = unsafePerformIO $ do
   scores <- vectorToList v
   return $ M.fromList $ zip (selectedVertices g vs) (map round scores)
 
-{-
-5.11. igraph_eigenvector_centrality — Eigenvector centrality of the vertices
+foreign import ccall "igraph_eigenvector_centrality"
+  c_igraph_eigenvector_centrality
+    :: GraphPtr
+    -> VectorPtr
+    -> Ptr CDouble
+    -> Bool
+    -> Bool
+    -> VectorPtr
+    -> ArpackPtr
+    -> IO CInt
 
-  int igraph_eigenvector_centrality(const igraph_t *graph, 
-                                    igraph_vector_t *vector,
-                                    igraph_real_t *value, 
-                                    igraph_bool_t directed, igraph_bool_t scale,
-                                    const igraph_vector_t *weights,
-                                    igraph_arpack_options_t *options);
+-- | 5\.11\. `igraph_eigenvector_centrality` — Eigenvector centrality of the vertices
+eigenvectorCentrality
+  :: Graph d a
+  -> Bool -- ^ If True the result will be scaled such that the absolute value
+          -- of the maximum centrality is one.
+  -> (Double, [(a, Double)])
+eigenvectorCentrality g s = unsafePerformIO $ alloca $ \dp -> do
+  v  <- newVector 0
+  _e <- withGraph g $ \gp ->
+        withVector v $ \vp ->
+        withOptionalWeights g $ \wp ->
+        withArpack g $ \ap ->
+          c_igraph_eigenvector_centrality
+            gp
+            vp
+            dp
+            True
+            s
+            wp
+            ap
+  res <- peek dp
+  lis <- vectorToList v
+  return (realToFrac res, zip (nodes g) lis)
 
-5.12. igraph_hub_score — Kleinberg's hub scores
+foreign import ccall "igraph_hub_score"
+  c_igraph_hub_score
+    :: GraphPtr
+    -> VectorPtr
+    -> Ptr CDouble
+    -> Bool
+    -> VectorPtr
+    -> ArpackPtr
+    -> IO CInt
 
-  int igraph_hub_score(const igraph_t *graph, igraph_vector_t *vector,
-                       igraph_real_t *value, igraph_bool_t scale,
-                       const igraph_vector_t *weights,
-                       igraph_arpack_options_t *options);
+-- | 5\.12\. `igraph_hub_score` — Kleinberg's hub scores
+hubScore
+  :: Graph d a
+  -> Bool -- ^ If True then the result will be scaled such that the absolute
+          -- value of the maximum centrality is one.
+  -> (Double, [(a, Double)])
+hubScore g s = unsafePerformIO $ alloca $ \dp -> do
+  v  <- newVector 0
+  _e <- withGraph g $ \gp ->
+        withVector v $ \vp ->
+        withOptionalWeights g $ \wp ->
+        withArpack g $ \ap ->
+          c_igraph_hub_score
+            gp
+            vp
+            dp
+            s
+            wp
+            ap
+  res <- peek dp
+  lis <- vectorToList v
+  return (realToFrac res, zip (nodes g) lis)
 
-5.13. igraph_authority_score — Kleinerg's authority scores
+foreign import ccall "igraph_authority_score"
+  c_igraph_authority_score
+    :: GraphPtr
+    -> VectorPtr
+    -> Ptr CDouble
+    -> Bool
+    -> VectorPtr
+    -> ArpackPtr
+    -> IO CInt
 
-  int igraph_authority_score(const igraph_t *graph, igraph_vector_t *vector,
-                             igraph_real_t *value, igraph_bool_t scale,
-                             const igraph_vector_t *weights,
-                             igraph_arpack_options_t *options);
+-- | 5\.13\. `igraph_authority_score` — Kleinerg's authority scores
+authorityScore
+  :: Graph d a
+  -> Bool -- ^ If True then the result will be scaled such that the absolute
+          -- value of the maximum centrality is one.
+  -> (Double, [(a, Double)])
+authorityScore g s = unsafePerformIO $ alloca $ \dp -> do
+  v  <- newVector 0
+  _e <- withGraph g $ \gp ->
+        withVector v $ \vp ->
+        withOptionalWeights g $ \wp ->
+        withArpack g $ \ap ->
+          c_igraph_authority_score
+            gp
+            vp
+            dp
+            s
+            wp
+            ap
+  res <- peek dp
+  lis <- vectorToList v
+  return (realToFrac res, zip (nodes g) lis)
 
--}
 
 --------------------------------------------------------------------------------
 -- 13.6 Estimating Centrality Measures
@@ -1477,19 +1645,43 @@ centralizationCloseness g n = unsafePerformIO $
            , realToFrac c
            , realToFrac t )
 
-{-
-7.5. igraph_centralization_eigenvector_centrality — Calculate eigenvector centrality scores and graph centralization
+foreign import ccall "igraph_centralization_eigenvector_centrality"
+  c_igraph_centralization_eigenvector_centrality
+    :: GraphPtr
+    -> Ptr CDouble
+    -> Bool
+    -> Bool
+    -> ArpackPtr
+    -> Ptr CDouble
+    -> Ptr CDouble
+    -> Bool
+    -> IO CInt
 
-  int igraph_centralization_eigenvector_centrality(const igraph_t *graph,
-                                                   igraph_vector_t *vector,
-                                                   igraph_real_t *value,
-                                                   igraph_bool_t directed,
-                                                   igraph_bool_t scale,
-                                                   igraph_arpack_options_t *options,
-                                                   igraph_real_t *centralization,
-                                                   igraph_real_t *theoretical_max,
-                                                   igraph_bool_t normalized);
--}
+-- | 7.5. igraph_centralization_eigenvector_centrality — Calculate eigenvector centrality scores and graph centralization
+centralizationEigenvectorCentrality
+  :: Graph d a
+  -> Bool -- ^ If True then the result will be scaled, such that the absolute value of the maximum centrality is one.
+  -> Bool -- ^ Boolean, whether to calculate a normalized centralization score. See igraph_centralization() for how the normalization is done.
+  -> (Double, Double, Double) -- ^ (leading eigen-value, centralization score, theoretical max)
+centralizationEigenvectorCentrality g s n = unsafePerformIO $
+  alloca $ \evp ->
+  alloca $ \csp ->
+  alloca $ \tmp -> do
+    _e <- withGraph g $ \gp ->
+          withArpack g $ \ap ->
+            c_igraph_centralization_eigenvector_centrality
+              gp
+              evp
+              True
+              s
+              ap
+              csp
+              tmp
+              n
+    ev <- peek evp
+    cs <- peek csp
+    tm <- peek tmp
+    return (realToFrac ev,realToFrac cs,realToFrac tm)
 
 foreign import ccall "igraph_centralization_degree_tmax"
   c_igraph_centralization_degree_tmax
@@ -1992,15 +2184,47 @@ minimumSpanningTree g@(G _) = unsafePerformIO $ do
             wp
   vectorToEdges g v
 
-{- 9.2. igraph_minimum_spanning_tree_unweighted — Calculates one minimum
- - spanning tree of an unweighted graph.
+foreign import ccall "igraph_minimum_spanning_tree_unweighted"
+  c_igraph_minimum_spanning_tree_unweighted
+    :: GraphPtr
+    -> GraphPtr
+    -> IO CInt
 
-int igraph_minimum_spanning_tree_unweighted(const igraph_t *graph, 
-              igraph_t *mst);
+-- | 9\.2\. `igraph_minimum_spanning_tree_unweighted` — Calculates one minimum
+-- spanning tree of an unweighted graph.
+minimumSpanningTreeUnweighted :: IsUnweighted d => Graph d a -> Graph d a
+minimumSpanningTreeUnweighted g = unsafePerformIO $
+  withGraph g $ \gp ->
+  withGraph (emptyWithCtxt g) $ \gp' -> do
+    setVertexIds gp
+    _e <- c_igraph_minimum_spanning_tree_unweighted
+            gp
+            gp'
+    subgraphFromPtr g gp'
 
--- TODO
--}
+foreign import ccall "igraph_minimum_spanning_tree_prim"
+  c_igraph_minimum_spanning_tree_prim
+    :: GraphPtr
+    -> GraphPtr
+    -> VectorPtr
+    -> IO CInt
 
+-- | 9\.3\. `igraph_minimum_spanning_tree_prim` — Calculates one minimum
+-- spanning tree of a weighted graph.
+minimumSpanningTreePrim
+  :: IsUnweighted d
+  => Graph (Weighted d) a
+  -> Graph (Weighted d) a
+minimumSpanningTreePrim g = unsafePerformIO $
+  withGraph g $ \gp ->
+  withOptionalWeights g $ \wp ->
+  withGraph (emptyWithCtxt g) $ \gp' -> do
+    setVertexIds gp
+    _e <- c_igraph_minimum_spanning_tree_prim
+            gp
+            gp'
+            wp
+    subgraphFromPtr g gp'
 
 --------------------------------------------------------------------------------
 -- 13.10 Transitivity or Clustering Coefficient

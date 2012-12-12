@@ -13,7 +13,6 @@ void c_igraph_destroy (igraph_t* graph)
 {
     if (graph)
         igraph_destroy(graph);
-    //free(graph);
     graph = NULL;
     return;
 }
@@ -30,7 +29,6 @@ void c_igraph_vector_destroy (igraph_vector_t* vector)
 {
     if (vector)
         igraph_vector_destroy(vector);
-    //free(vector);
     vector = NULL;
     return;
 }
@@ -60,9 +58,15 @@ void c_igraph_vector_ptr_destroy (igraph_vector_ptr_t* vector_ptr)
 
     if (vector_ptr)
         igraph_vector_ptr_destroy(vector_ptr);
-    //free(vector_ptr);
     vector_ptr = NULL;
     return;
+}
+
+void c_graph_vector_destroy(igraph_vector_ptr_t* vector_ptr)
+{
+    if (vector_ptr)
+      igraph_free(vector_ptr);
+    vector_ptr = NULL;
 }
 
 igraph_matrix_t* c_igraph_matrix_create (long int nrow, long int ncol)
@@ -77,7 +81,6 @@ void c_igraph_matrix_destroy (igraph_matrix_t* matrix)
 {
     if (matrix)
         igraph_matrix_destroy(matrix);
-    //free(matrix);
     matrix = NULL;
     return;
 }
@@ -92,7 +95,6 @@ void c_igraph_vs_destroy (igraph_vs_t* vs)
 {
     if (vs)
         igraph_vs_destroy(vs);
-    //free(vs);
     vs = NULL;
     return;
 }
@@ -107,7 +109,6 @@ void c_igraph_es_destroy(igraph_es_t* es)
 {
     if (es)
         igraph_es_destroy(es);
-    //free(es);
     es = NULL;
     return;
 }
@@ -145,7 +146,6 @@ igraph_vector_ptr_t* edges(const igraph_t *graph)
     igraph_vector_ptr_set(res, 1, (void*)&graph->to);
     return res;
 }
-
 
 /*******************************************************************************
  *

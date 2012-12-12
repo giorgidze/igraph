@@ -486,6 +486,15 @@ newVectorPtr' vp = do
   fvp <- newForeignPtr c_igraph_vector_ptr_destroy vp
   return $ VectorP fvp
 
+foreign import ccall "&c_graph_vector_destroy"
+  c_graph_vector_destroy :: FunPtr (Ptr GraphVec -> IO ())
+
+newGraphVector :: Int -> IO GraphVectorP
+newGraphVector s = do
+  gvp  <- c_igraph_vector_ptr_create (fromIntegral s)
+  fgvp <- newForeignPtr c_graph_vector_destroy (castPtr gvp)
+  return $ GraphVectorP fgvp
+
 foreign import ccall "igraph_vector_ptr_e"                c_igraph_vector_ptr_get             :: VectorPtrPtr -> CLong -> IO VectorPtr
 foreign import ccall "igraph_vector_ptr_size"             c_igraph_vector_ptr_length          :: VectorPtrPtr -> IO CLong
 
@@ -524,6 +533,16 @@ vectorPtrToEdges g@(G _) v = do
   l <- vectorPtrToList v
   return $ map (map (edgeIdToEdge g . round)) l
 
+graphVectorToSubgraphs :: GraphVectorP -> Graph d a -> IO [Graph d a]
+graphVectorToSubgraphs (GraphVectorP fvp) g = withForeignPtr fvp $ \vp -> do
+  len <- c_igraph_vector_ptr_length (castPtr vp)
+  let go :: Graph d a -> [Graph d a] -> CLong -> IO [Graph d a]
+      go _    acc 0 = return acc
+      go ctxt acc i = do gp <- c_igraph_vector_ptr_get (castPtr vp) (i-1)
+                         --fp <- newForeignPtr c_igraph_destroy gp
+                         g' <- subgraphFromPtr ctxt (castPtr gp)
+                         go ctxt (g' : acc) (i-1)
+  go g [] len
 
 --------------------------------------------------------------------------------
 -- Ptr stuff
@@ -536,6 +555,9 @@ withVector (Vector fvp) = withForeignPtr fvp
 
 withVectorPtr :: VectorP -> (VectorPtrPtr -> IO a) -> IO a
 withVectorPtr (VectorP fvp) = withForeignPtr fvp
+
+withGraphVector :: GraphVectorP -> (GraphVecPtr -> IO a) -> IO a
+withGraphVector (GraphVectorP fgvp) = withForeignPtr fgvp
 
 {-
 withSparseMatrix :: SparseMatrix -> (SpMatrixPtr -> IO a) -> IO a

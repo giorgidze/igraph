@@ -22,6 +22,11 @@ type VectorPtrPtr = Ptr VecPtr
 newtype Vector    = Vector    { unV  :: ForeignPtr Vec }
 newtype VectorP   = VectorP   { unVP :: ForeignPtr VecPtr }
 
+-- vector of graphs
+data GraphVec
+type GraphVecPtr  = Ptr GraphVec
+newtype GraphVectorP = GraphVectorP { unGVP :: ForeignPtr GraphVec }
+
 data Mat
 type MatrixPtr    = Ptr Mat
 newtype Matrix    = Matrix    { unM  :: ForeignPtr Mat }
