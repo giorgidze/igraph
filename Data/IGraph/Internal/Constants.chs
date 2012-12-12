@@ -176,14 +176,14 @@ sizeOfVector = {#sizeof vector_t #}
   , IGRAPH_FAS_APPROX_EADES as ApproxEades }
   deriving (Eq, Show) #}
 
-{-
-{#enum igraph_subgraph_implementation_t as
-  { IGRAPH_SUBGRAPH_AUTO = 0,
-             IGRAPH_SUBGRAPH_COPY_AND_DELETE,
-         IGRAPH_SUBGRAPH_CREATE_FROM_SCRATCH
-       }
+{#enum igraph_subgraph_implementation_t as SubgraphImplementation
+  { IGRAPH_SUBGRAPH_AUTO as SubgraphAuto
+  , IGRAPH_SUBGRAPH_COPY_AND_DELETE as CopyAndDelete
+  , IGRAPH_SUBGRAPH_CREATE_FROM_SCRATCH as CreateFromScratch
+  }
   deriving (Eq, Show) #}
 
+{-
 {#enum igraph_imitate_algorithm_t as ImitateAlgorithm
   { ImitateAugmented, ImitateBlind, ImitateContracted }
   deriving (Eq, Show) #}

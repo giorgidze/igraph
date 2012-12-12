@@ -269,9 +269,22 @@ int neighborhood_graphs (const igraph_t *graph, igraph_vector_ptr_t *res, igraph
  *
  */
 
+int induced_subgraph(const igraph_t *graph, igraph_t *res, 
+        const igraph_vs_t *vids, igraph_subgraph_implementation_t impl)
+{
+    return igraph_induced_subgraph(graph, res, *vids, impl);
+}
+
+
 int subgraph(const igraph_t *graph, igraph_t *res, const igraph_vs_t* vids)
 {
     return igraph_subgraph(graph, res, *vids);
+}
+
+int subgraph_edges(const igraph_t *graph, igraph_t *res,
+                   const igraph_es_t *eids, igraph_bool_t delete_vertices)
+{
+    return igraph_subgraph_edges(graph, res, *eids, delete_vertices);
 }
 
 /*******************************************************************************

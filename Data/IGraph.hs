@@ -1,7 +1,8 @@
 -- | Haskell bindings to the igraph C library.
 --
--- See <http://igraph.sourceforge.net/doc/html/index.html> in the specified
--- section for more documentation about a specific function.
+-- Function descriptions have been copied from
+-- <http://igraph.sourceforge.net/doc/html/index.html> in the specified section.
+--
 module Data.IGraph
   ( -- * Base types
     Graph (..), E (..)
@@ -58,7 +59,9 @@ module Data.IGraph
 
     -- ** 13\.4 Graph Components
   , subcomponent
-  -- , subgraph
+  , inducedSubgraph, SubgraphImplementation(..)
+  , subgraphEdges
+  --, subgraph
   , isConnected
   -- , decompose
   , Connectedness(..)
@@ -855,46 +858,63 @@ subcomponent g a = case nodeToId g a of
     vectorToVertices g v
   _ -> []
 
-{-
 
-4.2. igraph_induced_subgraph — Creates a subgraph induced by the specified vertices.
+foreign import ccall "induced_subgraph"
+  c_igraph_induced_subcomponent :: GraphPtr -> GraphPtr -> VsPtr -> CInt -> IO CInt
 
-  int igraph_induced_subgraph(const igraph_t *graph, igraph_t *res, 
-                              const igraph_vs_t vids, igraph_subgraph_implementation_t impl);
+-- | 4\.2\. `igraph_induced_subgraph` — Creates a subgraph induced by the specified vertices.
+inducedSubgraph :: Graph d a -> VertexSelector a -> SubgraphImplementation -> Graph d a
+inducedSubgraph g vs i = unsafePerformIO $ do
+  withGraph g $ \gp ->
+    withVs vs g $ \vsp ->
+    withGraph (emptyWithCtxt g) $ \gp' -> do
+      setVertexIds gp
+      _e <- c_igraph_induced_subcomponent
+              gp
+              gp'
+              vsp
+              (fromIntegral $ fromEnum i)
+      subgraphFromPtr g gp'
+  
+foreign import ccall "subgraph_edges"
+  c_igraph_subgraph_edges
+    :: GraphPtr
+    -> GraphPtr
+    -> EsPtr
+    -> Bool
+    -> IO CInt
 
-foreign import ccall "igraph_induced_subcomponent"
-  c_igraph_induced_subcomponent :: GraphPtr d a
+-- | 4\.3\. `igraph_subgraph_edges` — Creates a subgraph with the specified edges and their endpoints.
+subgraphEdges :: Graph d a -> EdgeSelector d a -> Graph d a
+subgraphEdges g es = unsafePerformIO $ do
+  withGraph g $ \gp ->
+    withEs es g $ \esp ->
+    withGraph (emptyWithCtxt g) $ \gp' -> do
+      setVertexIds gp
+      _e <- c_igraph_subgraph_edges
+              gp
+              gp'
+              esp
+              True
+      subgraphFromPtr g gp'
 
-4.3. igraph_subgraph_edges — Creates a subgraph with the specified edges and their endpoints.
+{-   DEPRECATED
 
-  int igraph_subgraph_edges(const igraph_t *graph, igraph_t *res, 
-                            const igraph_es_t eids, igraph_bool_t delete_vertices);
-
-4.4. igraph_subgraph — Creates a subgraph induced by the specified vertices.
-
-  int igraph_subgraph(const igraph_t *graph, igraph_t *res, 
-                      const igraph_vs_t vids);
-
--}
-
-{-
 foreign import ccall "subgraph"
-  c_igraph_subgraph :: GraphPtr d a -> GraphPtr d a -> VsPtr -> IO CInt
+  c_igraph_subgraph :: GraphPtr -> GraphPtr -> VsPtr -> IO CInt
 
-subgraph :: VertexSelector a -> IGraph (Graph d a) (Graph d a)
-subgraph vs = do
-  setVertexIds
-  (_e, G Graph{ graphForeignPtr = Just subg }) <- runUnsafeIO $ \g ->
-    withGraph g $ \gp -> do
-      withVs vs g $ \vsp ->
-        withGraph (emptyWithCtxt g) $ \gp' -> do
-          c_igraph_subgraph gp gp' vsp
-  g <- get
-  return $ foreignGraph g subg
-  --return $ G $ ForeignGraph subg (graphIdToNode g)
- where
-  emptyWithCtxt :: Graph d a -> Graph d a
-  emptyWithCtxt (G _) = emptyGraph
+-- | 4\.4\. `igraph_subgraph` — Creates a subgraph induced by the specified vertices.
+subgraph :: Graph d a -> VertexSelector a -> Graph d a
+subgraph g vs = unsafePerformIO $ do
+  withGraph g $ \gp ->
+    withVs vs g $ \vsp ->
+    withGraph (emptyWithCtxt g) $ \gp' -> do
+      setVertexIds gp
+      _e <- c_igraph_subgraph
+              gp
+              gp'
+              vsp
+      subgraphFromPtr g gp'
 -}
 
 {-

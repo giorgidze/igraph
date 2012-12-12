@@ -5,9 +5,10 @@ module Data.IGraph.Internal where
 import qualified Data.HashMap.Strict as Map
 import qualified Data.HashSet as Set
 import qualified Data.Foldable as F
+import qualified Data.Map as M
 
 import Control.Monad
-import Data.List
+import Data.List as L
 import Data.IORef
 import Foreign hiding (unsafePerformIO)
 import Foreign.C
@@ -44,6 +45,69 @@ getNeiMode (G g) = fromIntegral $ fromEnum (graphNeiMode g)
 --------------------------------------------------------------------------------
 -- Graphs
 
+
+--
+-- Graph IDs
+--
+
+foreign import ccall "igraphhaskell_graph_set_vertex_ids"
+  c_igraphhaskell_graph_set_vertex_ids :: GraphPtr -> IO Int
+
+setVertexIds :: GraphPtr -> IO ()
+setVertexIds gp = do
+  e <- c_igraphhaskell_graph_set_vertex_ids gp
+  case e of
+       -1 -> error "setVertexIds: igraph C attributes not initialized. Try compiling your program with GHC instead of using GHCi."
+       _  -> return ()
+
+foreign import ccall "igraphhaskell_graph_get_vertex_ids"
+  c_igraphhaskell_graph_get_vertex_ids :: GraphPtr -> VectorPtr -> IO CInt
+
+getVertexIds :: GraphPtr -> IO (Maybe [Double])
+getVertexIds gp = do
+  v <- newVector 0
+  s <- withVector v $ \vp ->
+         c_igraphhaskell_graph_get_vertex_ids
+           gp
+           vp
+  case s of
+       1  -> return Nothing
+       -1 -> error "getVertexIds: igraph C attributes not initialized. Try compiling your program with GHC instead of using GHCi."
+       _  -> Just `fmap` vectorToList v
+
+subgraphFromPtr :: Graph d a -> GraphPtr -> IO (Graph d a)
+subgraphFromPtr g@(G _) gp' = do
+  Just is <- getVertexIds gp'
+  [l1,l2] <- vectorPtrToList =<< newVectorPtr' =<< c_igraph_edges gp'
+  let lookupM = M.fromList $ zip [0..] (map round is)
+      orgId :: Int -> Int
+      orgId i = case M.lookup i lookupM of
+        Just o -> o
+        _      -> error $ "subgraphFromPtr: Invalid ID " ++ show i
+      getNodes = map (idToNode'' g . orgId . round)
+      ls = zip (getNodes l1) (getNodes l2)
+  return $ fromListWithCtxt g ls
+ where
+  fromListWithCtxt :: Graph d a -> [(a,a)] -> Graph d a
+  fromListWithCtxt (G _) l = fromList l
+
+
+isInitialized :: IORef Bool
+isInitialized = unsafePerformIO $ newIORef False
+
+foreign import ccall "igraphhaskell_initialize"
+  c_igraphhaskell_initialize :: IO CInt
+
+-- | Initialize C vertex attributes (only once!)
+initialize :: IO ()
+initialize = do
+  _ <- c_igraphhaskell_initialize
+  writeIORef isInitialized True
+
+--
+-- Graph construction
+--
+
 foreign import ccall "c_igraph_create"
   c_igraph_create :: VectorPtr -> CInt -> IO (Ptr Void)
 
@@ -51,7 +115,11 @@ buildForeignGraph :: Graph d a -> Graph d a
 buildForeignGraph g@(G gr) = G (gr {graphForeignPtr = unsafePerformIO io})
   where
   io :: IO (ForeignPtr Void)
-  io = do v <- edgesToVector g
+  io = do -- initialize vertex IDs/C attributes
+          alreadyIntialized <- readIORef isInitialized
+          unless alreadyIntialized initialize
+          -- initialization done
+          v <- edgesToVector g
           withVector v $ \vp -> do
             gp  <- c_igraph_create vp (if isDirected g then 1 else 0)
             newForeignPtr c_igraph_destroy gp
@@ -466,6 +534,10 @@ toEdgeWeighted a b w = W (toEdge a b) w
 
 emptyGraph :: E d a => Graph d a
 emptyGraph = buildForeignGraph $ G (Graph 0 0 Map.empty Map.empty Set.empty undefined Out)
+
+-- Get old context
+emptyWithCtxt :: Graph d a -> Graph d a
+emptyWithCtxt (G _) = emptyGraph
 
 fromList :: E d a => [(a,a)] -> Graph d a
 fromList = foldl' (\g (a,b) -> insertEdge (toEdge a b) g) emptyGraph

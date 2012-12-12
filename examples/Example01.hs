@@ -12,6 +12,10 @@ h: 0 --- 1 --- 2 --- 3   4 --- 5 --- 6
     \               /     \         /
      `-------------´       `-------´
 
+w: 0 -1- 1 -3- 2 -1- 3
+    \               /
+     `------1------´
+
 -}
 
 g,h :: Graph D Int
@@ -29,4 +33,4 @@ main = do
   putStrLn $ "0 and 5 are connected:       " ++ show (areConnected g 0 5)
   putStrLn $ "Graph is connected:          " ++ show (isConnected g Weak)
   putStrLn $ "Shortest path from 0 to 5:   " ++ show (getShortestPath g 0 5)
-  -- putStrLn $ "Subgraph containing [3,4,5]: " ++ show (subgraph (VsList [3,4,5]))
+  putStrLn $ "Subgraph containing [3,4,5]: " ++ show (inducedSubgraph g (VsList [3,4,5]) SubgraphAuto)
