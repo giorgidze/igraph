@@ -63,10 +63,13 @@ data G d a
 -- directed edges @Edge D a@.
 class (Eq a, Hashable a, Eq (Edge d a), Hashable (Edge d a)) => E d a where
   data Edge d a
+  isDirected :: Graph d a -> Bool
+  isWeighted :: Graph d a -> Bool
   toEdge     :: a -> a -> Edge d a
   edgeFrom   :: Edge d a -> a
   edgeTo     :: Edge d a -> a
-  isDirected :: Graph d a -> Bool
+  edgeWeight :: Edge d a -> Maybe Int
+  setWeight  :: Edge d a -> Int -> Edge d a
   getWeights :: Graph d a -> Maybe [Int]
 
 -- | Undirected graph
@@ -74,10 +77,13 @@ data U
 
 instance (Eq a, Hashable a) => E U a where
   isDirected _ = False
+  isWeighted _ = False
   data Edge U a = U_Edge a a
   toEdge = U_Edge
   edgeFrom (U_Edge a _) = a
   edgeTo   (U_Edge _ b) = b
+  edgeWeight _ = Nothing
+  setWeight e _ = e
   getWeights _ = Nothing
 
 instance Eq a => Eq (Edge U a) where
@@ -97,10 +103,13 @@ data D
 
 instance (Eq a, Hashable a) => E D a where
   isDirected _ = True
+  isWeighted _ = False
   data Edge D a = D_Edge a a deriving Eq
   toEdge = D_Edge
   edgeFrom (D_Edge a _) = a
   edgeTo   (D_Edge _ b) = b
+  edgeWeight _ = Nothing
+  setWeight e _ = e
   getWeights _ = Nothing
 
 instance Hashable a => Hashable (Edge D a) where
@@ -142,11 +151,14 @@ data Weighted d
 
 instance (E d a, IsUnweighted d) => E (Weighted d) a where
   isDirected = liftIsDirected
+  isWeighted _ = True
   data Edge (Weighted d) a = W (Edge d a) Int
   toEdge a b = W (toEdge a b) 0
   edgeFrom (W e _) = edgeFrom e
   edgeTo   (W e _) = edgeTo   e
-  getWeights (G g)   = Just $ S.foldr (\(W _  w) r -> w:r) [] (graphEdges g)
+  edgeWeight (W _ w)  = Just w
+  setWeight (W e _) w = W e w
+  getWeights (G g)    = Just $ S.foldr (\(W _  w) r -> w:r) [] (graphEdges g)
 
 instance E d a => Eq (Edge (Weighted d) a) where
   (W e w) == (W e' w') = w == w' && e == e'

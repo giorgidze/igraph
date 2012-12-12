@@ -10,6 +10,7 @@ import qualified Data.Map as M
 import Control.Monad
 import Data.List as L
 import Data.IORef
+import Data.Maybe
 import Foreign hiding (unsafePerformIO)
 import Foreign.C
 import System.IO.Unsafe (unsafePerformIO)
@@ -86,10 +87,30 @@ subgraphFromPtr g@(G _) gp' = do
         _      -> error $ "subgraphFromPtr: Invalid ID " ++ show i
       getNodes = map (idToNode'' g . orgId . round)
       ls = zip (getNodes l1) (getNodes l2)
-  return $ fromListWithCtxt g ls
+      -- final graph without weights
+      subg@(G sg) = fromListWithCtxt g ls
+      -- set correct weights
+      wes' = [ setWeight (toEdge a b) w
+             | e <- intersectBy (eqOnEdgeNodes g)
+                                (edges g)
+                                (edges subg)
+             , let a = edgeFrom e
+                   b = edgeTo e
+                   w = fromMaybe 0 (edgeWeight e)
+             ]
+      subgWithWeights = G sg{ graphEdges = Set.fromList wes' }
+  return $
+    if isWeighted g
+       then subgWithWeights
+       else subg
  where
   fromListWithCtxt :: Graph d a -> [(a,a)] -> Graph d a
   fromListWithCtxt (G _) l = fromList l
+
+  eqOnEdgeNodes :: Eq a => Graph d a -> Edge d a -> Edge d a -> Bool
+  eqOnEdgeNodes (G _) e1 e2 =
+    (==) (edgeFrom e1, edgeTo e1)
+         (edgeFrom e2, edgeTo e2)
 
 
 isInitialized :: IORef Bool
