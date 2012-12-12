@@ -117,6 +117,20 @@ int es_fromto(igraph_es_t *es, igraph_vs_t *from, igraph_vs_t *to)
   return igraph_es_fromto(es, *from, *to);
 }
 
+igraph_arpack_options_t* c_arpack_create()
+{
+  igraph_arpack_options_t *arpack = (igraph_arpack_options_t*) malloc(sizeof(igraph_arpack_options_t));
+  igraph_arpack_options_init(arpack);
+  return arpack;
+}
+
+void c_arpack_destroy(igraph_arpack_options_t* arpack)
+{
+  if (arpack)
+    free(arpack);
+  arpack = NULL;
+}
+
 /*******************************************************************************
  * 
  * Helpers

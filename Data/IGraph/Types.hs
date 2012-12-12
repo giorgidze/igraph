@@ -12,9 +12,8 @@ import Data.IGraph.Internal.Constants
 --------------------------------------------------------------------------------
 -- C stuff
 
-data Void
-
-type GraphPtr = Ptr Void
+data Grph
+type GraphPtr     = Ptr Grph
 
 data Vec
 type VectorPtr    = Ptr Vec
@@ -40,6 +39,9 @@ data Es
 type EsPtr     = Ptr Es
 newtype EsForeignPtr = EsF { unEsF :: ForeignPtr Es }
 
+data Arpack
+type ArpackPtr = Ptr Arpack
+
 --------------------------------------------------------------------------------
 -- Graph representation
 
@@ -55,7 +57,8 @@ data G d a
           , graphIdToNode          :: !(HashMap Int a)
           , graphNodeToId          :: !(HashMap a Int)
           , graphEdges             :: !(HashSet (Edge d a))
-          , graphForeignPtr        :: ForeignPtr Void
+          , graphForeignPtr        :: ForeignPtr Grph
+          , graphArpackOptions     :: ForeignPtr Arpack
           , graphNeiMode           :: NeiMode
           }
 

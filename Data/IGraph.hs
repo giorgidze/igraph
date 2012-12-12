@@ -70,7 +70,8 @@ module Data.IGraph
     -- ** 13\.5 Centrality Measures
   , closeness
   , betweenness, edgeBetweenness
-    --pagerank stuff here
+  , pagerank
+  -- more
   , constraint
   , maxdegree
   , strength
@@ -1071,18 +1072,45 @@ edgeBetweenness g = unsafePerformIO $ do
   scores <- vectorToList v
   return $ M.fromList $ zip (F.toList $ edges g) scores
 
+foreign import ccall "pagerank"
+  c_igraph_pagerank
+    :: GraphPtr
+    -> VectorPtr
+    -> Ptr CDouble
+    -> VsPtr
+    -> Bool
+    -> CDouble
+    -> VectorPtr
+    -> ArpackPtr
+    -> IO CInt
+
+-- | 5\.4\. `igraph_pagerank` — Calculates the Google PageRank for the specified vertices.
+pagerank
+  :: Graph d a
+  -> VertexSelector a
+  -> Double -- ^ The damping factor ("d" in the original paper)
+  -> (Double, [(a,Double)])
+pagerank g vs d = unsafePerformIO $ alloca $ \dp -> do
+  v  <- newVector 0
+  _e <- withGraph g $ \gp ->
+        withVector v $ \vp ->
+        withVs vs g $ \vsp ->
+        withOptionalWeights g $ \wp ->
+        withArpack g $ \ap ->
+          c_igraph_pagerank
+            gp
+            vp
+            dp
+            vsp
+            True
+            (realToFrac d)
+            wp
+            ap
+  res <- peek dp
+  lis <- vectorToList v
+  return (realToFrac res, zip (nodes g) lis)
+
 {-
-5.4. igraph_pagerank — Calculates the Google PageRank for the specified vertices.
-
-  int igraph_pagerank(const igraph_t *graph,
-                      igraph_vector_t *vector,
-                      igraph_real_t *value,
-                      const igraph_vs_t vids,
-                      igraph_bool_t directed,
-                      igraph_real_t damping, 
-                      const igraph_vector_t *weights,
-                      igraph_arpack_options_t *options);
-
 5.5. igraph_pagerank_old — Calculates the Google PageRank for the specified vertices.
 
   int igraph_pagerank_old(const igraph_t *graph, igraph_vector_t *res, 

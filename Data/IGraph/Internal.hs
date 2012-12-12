@@ -130,12 +130,21 @@ initialize = do
 --
 
 foreign import ccall "c_igraph_create"
-  c_igraph_create :: VectorPtr -> CInt -> IO (Ptr Void)
+  c_igraph_create :: VectorPtr -> CInt -> IO GraphPtr
+
+foreign import ccall "c_arpack_create"
+  c_arpack_create :: IO ArpackPtr
+
+foreign import ccall "&c_arpack_destroy"
+  c_arpack_destroy :: FunPtr (ArpackPtr -> IO ())
 
 buildForeignGraph :: Graph d a -> Graph d a
-buildForeignGraph g@(G gr) = G (gr {graphForeignPtr = unsafePerformIO io})
+buildForeignGraph g@(G gr) = G
+  (gr { graphForeignPtr    = unsafePerformIO io
+      , graphArpackOptions = unsafePerformIO arpack
+      })
   where
-  io :: IO (ForeignPtr Void)
+  io :: IO (ForeignPtr Grph)
   io = do -- initialize vertex IDs/C attributes
           alreadyIntialized <- readIORef isInitialized
           unless alreadyIntialized initialize
@@ -144,11 +153,15 @@ buildForeignGraph g@(G gr) = G (gr {graphForeignPtr = unsafePerformIO io})
           withVector v $ \vp -> do
             gp  <- c_igraph_create vp (if isDirected g then 1 else 0)
             newForeignPtr c_igraph_destroy gp
+  arpack :: IO (ForeignPtr Arpack)
+  arpack = do
+    p <- c_arpack_create
+    newForeignPtr c_arpack_destroy p
 
-withGraph :: Graph d a -> (Ptr Void -> IO res) -> IO res
+withGraph :: Graph d a -> (GraphPtr -> IO res) -> IO res
 withGraph (G gr) = withForeignPtr (graphForeignPtr gr)
 
-setGraphPointer :: Graph d a -> Ptr Void -> IO (Graph d a)
+setGraphPointer :: Graph d a -> GraphPtr -> IO (Graph d a)
 setGraphPointer (G g) gp = do
   fp <- newForeignPtr c_igraph_destroy gp
   return $ G g{ graphForeignPtr = fp }
@@ -302,6 +315,14 @@ withEs es g f = do
 
 withEs' :: EsForeignPtr -> (EsPtr -> IO res) -> IO res
 withEs' (EsF fp) = withForeignPtr fp
+
+--------------------------------------------------------------------------------
+-- ARPACK options
+
+withArpack :: Graph d a -> (ArpackPtr -> IO res) -> IO res
+withArpack (G Graph{ graphArpackOptions = fp }) f =
+  withForeignPtr fp f
+
 
 --------------------------------------------------------------------------------
 -- Matrices
@@ -524,8 +545,7 @@ withSparseMatrix (SparseMatrix fmp) = withForeignPtr fmp
 --------------------------------------------------------------------------------
 -- Foreign imports
 
-foreign import ccall "&c_igraph_destroy"                  c_igraph_destroy                    :: FunPtr (Ptr Void -> IO ())
-
+foreign import ccall "&c_igraph_destroy"                  c_igraph_destroy                    :: FunPtr (GraphPtr -> IO ())
 
 --------------------------------------------------------------------------------
 -- Helper Functions
@@ -554,7 +574,7 @@ toEdgeWeighted :: E d a => a -> a -> Int -> Edge (Weighted d) a
 toEdgeWeighted a b w = W (toEdge a b) w
 
 emptyGraph :: E d a => Graph d a
-emptyGraph = buildForeignGraph $ G (Graph 0 0 Map.empty Map.empty Set.empty undefined Out)
+emptyGraph = buildForeignGraph $ G (Graph 0 0 Map.empty Map.empty Set.empty undefined undefined Out)
 
 -- Get old context
 emptyWithCtxt :: Graph d a -> Graph d a
