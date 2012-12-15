@@ -62,9 +62,11 @@ module Data.IGraph
   , inducedSubgraph, SubgraphImplementation(..)
   , subgraphEdges
   --, subgraph
+  , clusters
   , isConnected
   , decompose
   , Connectedness(..)
+  , biconnectedComponents
   , articulationPoints
 
     -- ** 13\.5 Centrality Measures
@@ -871,6 +873,10 @@ foreign import ccall "induced_subgraph"
   c_igraph_induced_subcomponent :: GraphPtr -> GraphPtr -> VsPtr -> CInt -> IO CInt
 
 -- | 4\.2\. `igraph_induced_subgraph` — Creates a subgraph induced by the specified vertices.
+--
+-- This function collects the specified vertices and all edges between them to a
+-- new graph. As the vertex ids in a graph always start with zero, this function
+-- very likely needs to reassign ids to the vertices.
 inducedSubgraph :: Graph d a -> VertexSelector a -> SubgraphImplementation -> Graph d a
 inducedSubgraph g vs i = unsafePerformIO $ do
   withGraph g $ \gp ->
@@ -893,6 +899,10 @@ foreign import ccall "subgraph_edges"
     -> IO CInt
 
 -- | 4\.3\. `igraph_subgraph_edges` — Creates a subgraph with the specified edges and their endpoints.
+--
+-- This function collects the specified edges and their endpoints to a new
+-- graph. As the vertex ids in a graph always start with zero, this function
+-- very likely needs to reassign ids to the vertices.
 subgraphEdges :: Graph d a -> EdgeSelector d a -> Graph d a
 subgraphEdges g es = unsafePerformIO $ do
   withGraph g $ \gp ->
@@ -925,25 +935,47 @@ subgraph g vs = unsafePerformIO $ do
       subgraphFromPtr g gp'
 -}
 
-{-
-4.5. igraph_clusters — Calculates the (weakly or strongly) connected components in a graph.
+foreign import ccall "igraph_clusters"
+  c_igraph_clusters
+    :: GraphPtr
+    -> VectorPtr
+    -> VectorPtr
+    -> Ptr CInt
+    -> CInt
+    -> IO CInt
 
-  int igraph_clusters(const igraph_t *graph, igraph_vector_t *membership, 
-                      igraph_vector_t *csize, igraph_integer_t *no,
-                      igraph_connectedness_t mode);
--}
+-- | 4\.5\. `igraph_clusters` — Calculates the (weakly or strongly) connected
+-- components in a graph.
+clusters
+  :: Graph d a
+  -> Connectedness
+  -> (Int, [Int]) -- ^ (number of clusters, list of size of all clusters)
+clusters g c = unsafePerformIO $ alloca $ \ip -> do
+  v  <- newVector 0
+  _e <- withGraph g $ \gp ->
+        withVector v $ \vp ->
+          c_igraph_clusters
+            gp
+            nullPtr
+            vp
+            ip
+            (fromIntegral $ fromEnum c)
+  i <- peek ip
+  l <- vectorToList v
+  return (fromIntegral i, map round l)
+
 
 foreign import ccall "igraph_is_connected"
   c_igraph_is_connected :: GraphPtr -> Ptr CInt -> CInt -> IO CInt
 
 -- | 4\.6\. `igraph_is_connected` — Decides whether the graph is (weakly or strongly) connected.
+--
+-- A graph with zero vertices (i.e. the null graph) is connected by definition.
 isConnected :: Graph d a -> Connectedness -> Bool
 isConnected g c = unsafePerformIO $ withGraph g $ \gp -> alloca $ \b -> do
   _ <- c_igraph_is_connected gp b (fromIntegral $ fromEnum c)
   r <- peek b
   return $ r == 1
-
--- | 4.7. igraph_decompose — Decompose a graph into connected components.
 
 foreign import ccall "igraph_decompose"
   c_igraph_decompose
@@ -954,6 +986,11 @@ foreign import ccall "igraph_decompose"
     -> CInt
     -> IO CInt
 
+-- | 4\.7\. `igraph_decompose` — Decompose a graph into connected components.
+--
+-- Create separate graph for each component of a graph. Note that the vertex ids
+-- in the new graphs will be different than in the original graph. (Except if
+-- there is only one component in the original graph.)
 decompose
   :: Graph d a
   -> Connectedness
@@ -982,7 +1019,6 @@ necessary? no. -> foreign pointers!
 -}
 
 {-
--- | 4\.9\. `igraph_biconnected_components` — Calculate biconnected components
 
   int igraph_biconnected_components(const igraph_t *graph,
                                     igraph_integer_t *no,
@@ -991,12 +1027,54 @@ necessary? no. -> foreign pointers!
                                     igraph_vector_ptr_t *components,
                                     igraph_vector_t *articulation_points);
 
+-}
+
 foreign import ccall "igraph_biconnected_components"
   c_igraph_biconnected_components
     :: GraphPtr
     -> Ptr CInt
-    -> 
--}
+    -> VectorPtrPtr
+    -> VectorPtrPtr
+    -> VectorPtrPtr
+    -> VectorPtr
+    -> IO CInt
+
+-- | 4\.9\. `igraph_biconnected_components` — Calculate biconnected components
+--
+-- A graph is biconnected if the removal of any single vertex (and its incident
+-- edges) does not disconnect it.
+--
+-- A biconnected component of a graph is a maximal biconnected subgraph of it.
+-- The biconnected components of a graph can be given by the partition of its
+-- edges: every edge is a member of exactly one biconnected component. Note that
+-- this is not true for vertices: the same vertex can be part of many
+-- biconnected components.
+biconnectedComponents
+  :: Graph d a
+  -> (Int, [[Edge d a]], [[Edge d a]], [[a]], [a])
+biconnectedComponents g = unsafePerformIO $ alloca $ \ip -> do
+  t  <- newVectorPtr 0
+  ce <- newVectorPtr 0
+  c  <- newVectorPtr 0
+  a  <- newVector 0
+  _e <- withGraph g $ \gp ->
+        withVectorPtr t $ \tp ->
+        withVectorPtr ce $ \cep ->
+        withVectorPtr c $ \cp ->
+        withVector a $ \ap ->
+          c_igraph_biconnected_components
+            gp
+            ip
+            tp
+            cep
+            cp
+            ap
+  i   <- peek ip
+  ts  <- mapM (vectorToEdges'    g) =<< vectorPtrToListOfVectorPtr t
+  ces <- mapM (vectorToEdges'    g) =<< vectorPtrToListOfVectorPtr ce
+  cs  <- mapM (vectorToVertices' g) =<< vectorPtrToListOfVectorPtr c
+  as  <- vectorToVertices g a
+  return (fromIntegral i, ts, ces, cs, as)
 
 foreign import ccall "igraph_articulation_points"
   c_igraph_articulation_points :: GraphPtr -> VectorPtr -> IO CInt

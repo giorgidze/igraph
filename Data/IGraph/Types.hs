@@ -13,39 +13,39 @@ import Data.IGraph.Internal.Constants
 -- C stuff
 
 data Grph
-type GraphPtr     = Ptr Grph
+type GraphPtr        = Ptr Grph
 
 data Vec
-type VectorPtr    = Ptr Vec
+type VectorPtr       = Ptr Vec
 data VecPtr
-type VectorPtrPtr = Ptr VecPtr
-newtype Vector    = Vector    { unV  :: ForeignPtr Vec }
-newtype VectorP   = VectorP   { unVP :: ForeignPtr VecPtr }
+type VectorPtrPtr    = Ptr VecPtr
+newtype Vector       = Vector    { unV  :: ForeignPtr Vec }
+newtype VectorP      = VectorP   { unVP :: ForeignPtr VecPtr }
 
 -- vector of graphs
 data GraphVec
-type GraphVecPtr  = Ptr GraphVec
+type GraphVecPtr     = Ptr GraphVec
 newtype GraphVectorP = GraphVectorP { unGVP :: ForeignPtr GraphVec }
 
 data Mat
-type MatrixPtr    = Ptr Mat
-newtype Matrix    = Matrix    { unM  :: ForeignPtr Mat }
+type MatrixPtr       = Ptr Mat
+newtype Matrix       = Matrix    { unM  :: ForeignPtr Mat }
 
 data SpMat
 type SpMatrixPtr     = Ptr SpMat
 --newtype SparseMatrix = SparseMatrix { unSM :: ForeignPtr SpMat }
 
 data Vs
-type VsPtr     = Ptr Vs
-type VsIdent a = (a -> Maybe Int)
-newtype VsForeignPtr = VsF { unVsF :: ForeignPtr Vs }
+type VsPtr            = Ptr Vs
+type VsIdent a        = (a -> Maybe Int)
+newtype VsForeignPtr  = VsF { unVsF :: ForeignPtr Vs }
 
 data Es
-type EsPtr     = Ptr Es
-newtype EsForeignPtr = EsF { unEsF :: ForeignPtr Es }
+type EsPtr            = Ptr Es
+newtype EsForeignPtr  = EsF { unEsF :: ForeignPtr Es }
 
 data Arpack
-type ArpackPtr = Ptr Arpack
+type ArpackPtr        = Ptr Arpack
 
 --------------------------------------------------------------------------------
 -- Graph representation

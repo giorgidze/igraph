@@ -450,7 +450,10 @@ foreign import ccall "igraph_vector_e"                    c_igraph_vector_get   
 foreign import ccall "igraph_vector_size"                 c_igraph_vector_length              :: VectorPtr -> IO CLong
 
 vectorToList :: Vector -> IO [Double]
-vectorToList (Vector fvp) = withForeignPtr fvp $ \vp -> do
+vectorToList (Vector fvp) = withForeignPtr fvp vectorToList'
+
+vectorToList' :: VectorPtr -> IO [Double]
+vectorToList' vp = do
   len <- c_igraph_vector_length vp
   let go :: [Double] -> CLong -> IO [Double]
       go acc 0 = return acc
@@ -499,15 +502,21 @@ foreign import ccall "igraph_vector_ptr_e"                c_igraph_vector_ptr_ge
 foreign import ccall "igraph_vector_ptr_size"             c_igraph_vector_ptr_length          :: VectorPtrPtr -> IO CLong
 
 vectorPtrToList :: VectorP -> IO [[Double]]
-vectorPtrToList (VectorP fvp) = withForeignPtr fvp $ \vp -> do
+vectorPtrToList vptr = do
+  vps <- vectorPtrToListOfVectorPtr vptr
+  mapM vectorToList' vps
+
+vectorPtrToListOfVectorPtr
+  :: VectorP
+  -> IO [VectorPtr]
+vectorPtrToListOfVectorPtr (VectorP fvp) = withForeignPtr fvp $ \vp -> do
   len <- c_igraph_vector_ptr_length vp
-  let go :: [[Double]] -> CLong -> IO [[Double]]
+  let go :: [VectorPtr] -> CLong -> IO [VectorPtr]
       go acc 0 = return acc
-      go acc i = do e <- c_igraph_vector_ptr_get vp (i - 1)
-                    efp <- newForeignPtr c_igraph_vector_destroy e
-                    v <- vectorToList (Vector efp)
-                    go (v : acc) (i - 1)
+      go acc i = do vp' <- c_igraph_vector_ptr_get vp (i-1)
+                    go (vp':acc) (i-1)
   go [] len
+
 
 edgesToVector :: Graph d a -> IO Vector
 edgesToVector g@(G g') =
@@ -522,8 +531,16 @@ vectorToEdges g@(G _) v = do
   l <- vectorToList v
   return $ map (edgeIdToEdge g . round) l
 
+vectorToEdges' :: Graph d a -> VectorPtr -> IO [Edge d a]
+vectorToEdges' g@(G _) vp = do
+  l <- vectorToList' vp
+  return $ map (edgeIdToEdge g . round) l
+
 vectorToVertices :: Graph d a -> Vector -> IO [a]
 vectorToVertices g@(G _) v = fmap (map (idToNode'' g . round)) (vectorToList v)
+
+vectorToVertices' :: Graph d a -> VectorPtr -> IO [a]
+vectorToVertices' g@(G _) vp = fmap (map (idToNode'' g . round)) (vectorToList' vp)
 
 vectorPtrToVertices :: Graph d a -> VectorP -> IO [[a]]
 vectorPtrToVertices g@(G _) v = fmap (map (map (idToNode'' g . round))) (vectorPtrToList v)
