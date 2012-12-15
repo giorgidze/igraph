@@ -112,18 +112,14 @@ subgraphFromPtr g@(G _) gp' = do
     (==) (edgeFrom e1, edgeTo e1)
          (edgeFrom e2, edgeTo e2)
 
-
-isInitialized :: IORef Bool
-isInitialized = unsafePerformIO $ newIORef False
-
 foreign import ccall "igraphhaskell_initialize"
   c_igraphhaskell_initialize :: IO CInt
 
--- | Initialize C vertex attributes (only once!)
+-- | Initialize C vertex attributes (only once! -> C code handles this)
 initialize :: IO ()
 initialize = do
   _ <- c_igraphhaskell_initialize
-  writeIORef isInitialized True
+  return ()
 
 --
 -- Graph construction
@@ -146,8 +142,7 @@ buildForeignGraph g@(G gr) = G
   where
   io :: IO (ForeignPtr Grph)
   io = do -- initialize vertex IDs/C attributes
-          alreadyIntialized <- readIORef isInitialized
-          unless alreadyIntialized initialize
+          initialize
           -- initialization done
           v <- edgesToVector g
           withVector v $ \vp -> do
