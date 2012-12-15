@@ -167,6 +167,7 @@ import System.IO.Unsafe (unsafePerformIO)
 foreign import ccall "igraph_vs_size"
   c_igraph_vs_size :: GraphPtr -> VsPtr -> Ptr CInt -> IO CInt
 
+-- | 3\.4\. `igraph_vs_size` — Returns the size of the vertex selector.
 vsSize :: Graph d a -> VertexSelector a -> Int
 vsSize g vs = unsafePerformIO $ alloca $ \ip -> do
   _e <- withGraph g $ \gp ->
@@ -194,6 +195,7 @@ selectedVertices g vs = unsafePerformIO $ do
 foreign import ccall "igraph_es_size"
   c_igraph_es_size :: GraphPtr -> EsPtr -> Ptr CInt -> IO CInt
 
+-- | 8\.4\. `igraph_es_size` — Returns the size of the edge selector.
 esSize :: Graph d a -> EdgeSelector d a -> Int
 esSize g es = unsafePerformIO $ alloca $ \ip -> do
   _e <- withGraph g $ \gp ->
@@ -1051,7 +1053,9 @@ foreign import ccall "igraph_biconnected_components"
 -- biconnected components.
 biconnectedComponents
   :: Graph d a
-  -> (Int, [[Edge d a]], [[Edge d a]], [[a]], [a])
+  -> (Int, [[Edge d a]], [[Edge d a]], [[a]], [a]) -- ^ (number of biconnected
+  -- components, edges of spanning trees, edges of biconnected components,
+  -- vertices of biconnected components, articulation points of the graph)
 biconnectedComponents g = unsafePerformIO $ alloca $ \ip -> do
   t  <- newVectorPtr 0
   ce <- newVectorPtr 0
@@ -1735,11 +1739,19 @@ foreign import ccall "igraph_centralization_eigenvector_centrality"
     -> Bool
     -> IO CInt
 
--- | 7.5. igraph_centralization_eigenvector_centrality — Calculate eigenvector centrality scores and graph centralization
+-- | 7\.5\. `igraph_centralization_eigenvector_centrality` — Calculate
+-- eigenvector centrality scores and graph centralization
+--
+-- This function calculates the eigenvector centrality of the vertices by
+-- passing its arguments to igraph_eigenvector_centrality); and it calculates
+-- the graph level centralization index based on the results by calling
+-- igraph_centralization().
 centralizationEigenvectorCentrality
   :: Graph d a
-  -> Bool -- ^ If True then the result will be scaled, such that the absolute value of the maximum centrality is one.
-  -> Bool -- ^ Boolean, whether to calculate a normalized centralization score. See igraph_centralization() for how the normalization is done.
+  -> Bool -- ^ If True then the result will be scaled, such that the absolute
+          -- value of the maximum centrality is one.
+  -> Bool -- ^ Boolean, whether to calculate a normalized centralization score.
+          -- See igraph_centralization() for how the normalization is done.
   -> (Double, Double, Double) -- ^ (leading eigen-value, centralization score, theoretical max)
 centralizationEigenvectorCentrality g s n = unsafePerformIO $
   alloca $ \evp ->
