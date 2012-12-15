@@ -68,7 +68,7 @@ data G d a
           }
 
 -- | Class for graph edges, particularly for undirected edges @Edge U a@ and
--- directed edges @Edge D a@.
+-- directed edges @Edge D a@ and weighted edges.
 class (Eq a, Hashable a, Eq (Edge d a), Hashable (Edge d a)) => E d a where
   data Edge d a
   isDirected :: Graph d a -> Bool
@@ -140,17 +140,21 @@ instance IsUnweighted D where
   liftIsDirected _ = True
 
 
-class IsDirected d u | d -> u where
-  directedToUndirected :: Edge d a -> Edge u a
+class IsDirected d where
+  type ToUndirected d
+  directedToUndirected :: E (ToUndirected d) a => Edge d a -> Edge (ToUndirected d) a
 
-instance IsDirected D U where
+instance IsDirected D where
+  type ToUndirected D = U
   directedToUndirected (D_Edge a b) = (U_Edge a b)
 
 
-class IsUndirected u d | u -> d where
-  undirectedToDirected :: E d a => Edge u a -> Edge d a
+class IsUndirected u where
+  type ToDirected u
+  undirectedToDirected :: E (ToDirected u) a => Edge u a -> Edge (ToDirected u) a
 
-instance IsUndirected U D where
+instance IsUndirected U where
+  type ToDirected U = D
   undirectedToDirected (U_Edge a b) = (D_Edge a b)
 
 
@@ -180,10 +184,12 @@ instance Show (Edge d a) => Show (Edge (Weighted d) a) where
 instance (E d a, Ord (Edge d a)) => Ord (Edge (Weighted d) a) where
   (W e1 w1) <= (W e2 w2) = (e1,w1) <= (e2,w2)
 
-instance IsDirected (Weighted D) (Weighted U) where
+instance IsDirected (Weighted D) where
+  type ToUndirected (Weighted D) = Weighted (ToUndirected D)
   directedToUndirected (W e w) = W (directedToUndirected e) w
 
-instance IsUndirected (Weighted U) (Weighted D) where
+instance IsUndirected (Weighted U) where
+  type ToDirected (Weighted U) = Weighted (ToDirected U)
   undirectedToDirected (W e w) = W (undirectedToDirected e) w
 
 --------------------------------------------------------------------------------

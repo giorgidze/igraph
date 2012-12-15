@@ -4,13 +4,17 @@
 -- <http://igraph.sourceforge.net/doc/html/index.html> in the specified section.
 --
 module Data.IGraph
-  ( -- * Base types
-    Graph (..), E (..)
+  ( -- * Basic types
+    Graph (..), E (isDirected, isWeighted, edgeFrom, edgeTo, edgeWeight), Edge
   , D, U, IsUnweighted
   , Weighted, toEdgeWeighted, getWeight
-  , IsUndirected, IsDirected
+  , IsUndirected, ToDirected
+  , IsDirected, ToUndirected
 
-    -- * Construction / modification
+    -- * Pure Haskell functions
+    -- | These functions do not depend on the C library and perform no FFI calls.
+
+    -- ** Construction / modification
   , emptyGraph
   , fromList, fromListWeighted
   , insertEdge
@@ -18,7 +22,8 @@ module Data.IGraph
   , deleteNode
   , reverseGraphDirection
   , toDirected, toUndirected
-    -- * Query
+
+    -- ** Query
   , numberOfNodes
   , numberOfEdges
   , member

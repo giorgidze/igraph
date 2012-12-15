@@ -710,7 +710,9 @@ neighbours n g@(G _) =
     | edgeTo   e == n && not (isDirected g) = edgeFrom e : r
     | otherwise                             = r
 
--- | Reverse a graph direction (Out -> In, In -> Out, other -> Out). O(1)
+-- | Reverse graph direction. This simply changes the associated
+-- `igraph_neimode_t` of the graph (`IGRAPH_OUT` to `IGRAPH_IN`, `IGRAPH_IN` to
+-- `IGRAPH_OUT`, other to `IGRAPH_OUT`). O(1)
 reverseGraphDirection :: Graph d a -> Graph d a
 reverseGraphDirection (G g) = G g { graphNeiMode = reverse' (graphNeiMode g) }
  where
@@ -718,10 +720,10 @@ reverseGraphDirection (G g) = G g { graphNeiMode = reverse' (graphNeiMode g) }
   reverse' In  = Out
   reverse' _ = Out
 
-toDirected :: (IsUndirected u d, E d a, E u a) => Graph u a -> Graph d a
+toDirected :: (IsUndirected u, E u a, E (ToDirected u) a) => Graph u a -> Graph (ToDirected u) a
 toDirected (G g) =
   G g { graphEdges = Set.map undirectedToDirected (graphEdges g) }
 
-toUndirected :: (IsDirected d u, E d a, E u a) => Graph d a -> Graph u a
+toUndirected :: (IsDirected d, E d a, E (ToUndirected d) a) => Graph d a -> Graph (ToUndirected d) a
 toUndirected (G g) =
   G g { graphEdges = Set.map directedToUndirected (graphEdges g) }
