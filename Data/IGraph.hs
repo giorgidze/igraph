@@ -1,7 +1,7 @@
 -- | Haskell bindings to the igraph C library.
 --
 -- Function descriptions have been copied from
--- <http://igraph.sourceforge.net/doc/html/index.html> in the specified section.
+-- <http://igraph.sourceforge.net/doc/html/index.html> from the specified sections.
 --
 module Data.IGraph
   ( -- * Basic types

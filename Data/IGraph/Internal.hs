@@ -58,7 +58,7 @@ setVertexIds :: GraphPtr -> IO ()
 setVertexIds gp = do
   e <- c_igraphhaskell_graph_set_vertex_ids gp
   case e of
-       -1 -> error "setVertexIds: igraph C attributes not initialized. Try compiling your program with GHC instead of using GHCi."
+       -1 -> error "setVertexIds: igraph C attributes not initialized. Try compiling your program with GHC instead of using GHCi. See GHC ticket #781."
        _  -> return ()
 
 foreign import ccall "igraphhaskell_graph_get_vertex_ids"
@@ -73,7 +73,7 @@ getVertexIds gp = do
            vp
   case s of
        1  -> return Nothing
-       -1 -> error "getVertexIds: igraph C attributes not initialized. Try compiling your program with GHC instead of using GHCi."
+       -1 -> error "getVertexIds: igraph C attributes not initialized. Try compiling your program with GHC instead of using GHCi. See GHC ticket #781."
        _  -> Just `fmap` vectorToList v
 
 subgraphFromPtr :: Graph d a -> GraphPtr -> IO (Graph d a)
