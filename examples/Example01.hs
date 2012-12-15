@@ -26,7 +26,7 @@ g = fromList [(0,1), (1,2), (2,3), (3,4), (4,5), (0,3), (3,5)]
 h = fromList [(0,1), (1,2), (2,3), (0,3), (4,5), (5,6), (4,6)]
 
 w :: Graph (Weighted D) Int
-w = fromListWeighted [ (0,1, 1), (1,2, 3), (1,3, 1), (3,2, 1), (1,3, 2) ]
+w = fromListWeighted [ (0,1, 1), (1,2, 3), (1,3, 1), (3,2, 1), (1,3, 2), (0,3, 1) ]
 
 (~>) :: a -> b -> (a,b)
 a ~> b = (a,b)
@@ -39,6 +39,7 @@ main = do
   putStrLn $ "0 and 5 are connected:\n\t"       ++ show (areConnected g 0 5)
   putStrLn $ "Graph is connected:\n\t"          ++ show (isConnected g Weak)
   putStrLn $ "Shortest path from 0 to 5:\n\t"   ++ show (getShortestPath g 0 5)
+  putStrLn $ "Biconnected components of g:\n\t" ++ intercalate "\n\t" (map show . (\(_i,_t,ce,_c,_a) -> ce) $ biconnectedComponents g)
   putStrLn $ "Subgraph containing [3,4,5]:\n\t" ++ show (inducedSubgraph g (VsList [3,4,5]) SubgraphAuto)
   putStrLn $ "h decomposed (weakly):\n\t"       ++ intercalate "\n\t" (map show (decompose h Weak (-1) 0))
 
