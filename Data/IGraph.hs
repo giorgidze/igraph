@@ -63,6 +63,12 @@ module Data.IGraph
   , radius
 
     -- ** 13\.4 Graph Components
+    -- | Note that there currently is an issue with GHCi and shared libraries on
+    -- x86_64 linux systems which will cause an error in those functions that
+    -- return graphs (e.g. 'inducedSubgraph'). See GHC Ticket #781
+    -- (<http://hackage.haskell.org/trac/ghc/ticket/781>). Statically compiling
+    -- your program or installing this module (and all it's dependencies) with
+    -- @-fPIC@ should fix this issue.
   , subcomponent
   , inducedSubgraph, SubgraphImplementation(..)
   , subgraphEdges
