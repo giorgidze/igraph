@@ -9,7 +9,7 @@ Author:               Nils Schweinsberg, George Giorgidze
 Maintainer:           Giorgidze@Gmail.com
 Category:             Data Structures, Graphs
 Build-type:           Simple
-Cabal-version:        >=1.2
+Cabal-version:        >=1.6
 
 source-repository head
   type:               git
