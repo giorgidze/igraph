@@ -98,7 +98,8 @@ instance Eq a => Eq (Edge U a) where
   (U_Edge a b) == (U_Edge c d) = (a,b) == (c,d) || (a,b) == (d,c)
 
 instance Hashable a => Hashable (Edge U a) where
-  hash (U_Edge a b) = hash (a,b) + hash (b,a) -- to make sure (a,b) receives the same hash as (b,a)
+  -- to make sure (a,b) receives the same hash as (b,a):
+  hashWithSalt s (U_Edge a b) = hashWithSalt s (a,b) + hashWithSalt s (b,a)
 
 instance Ord a => Ord (Edge U a) where
   (U_Edge a b) <= (U_Edge c d) = (a,b) <= (c,d)
@@ -121,7 +122,7 @@ instance (Eq a, Hashable a) => E D a where
   getWeights _ = Nothing
 
 instance Hashable a => Hashable (Edge D a) where
-  hash (D_Edge a b) = hash (a,b)
+  hashWithSalt s (D_Edge a b) = hashWithSalt s (a,b)
 
 instance Show a => Show (Edge D a) where
   show (D_Edge a b) = "Edge D {" ++ show a ++ " -> " ++ show b ++ "}"
@@ -176,7 +177,7 @@ instance E d a => Eq (Edge (Weighted d) a) where
   (W e w) == (W e' w') = w == w' && e == e'
 
 instance E d a => Hashable (Edge (Weighted d) a) where
-  hash (W e w) = hash (edgeFrom e, edgeTo e, w)
+  hashWithSalt s (W e w) = hashWithSalt s (edgeFrom e, edgeTo e, w)
 
 instance Show (Edge d a) => Show (Edge (Weighted d) a) where
   show (W e w) = show e ++ "(" ++ show w ++ ")"
