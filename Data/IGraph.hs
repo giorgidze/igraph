@@ -5,8 +5,9 @@
 --
 module Data.IGraph
   ( -- * Basic types
-    Graph (..), E (isDirected, isWeighted, edgeFrom, edgeTo, edgeWeight), Edge
+    Graph (..)
   , D, U, IsUnweighted
+  , E (isDirected, isWeighted, edgeFrom, edgeTo, edgeWeight, toEdge), Edge
   , Weighted, toEdgeWeighted, getWeight
   , IsUndirected, ToDirected
   , IsDirected, ToUndirected

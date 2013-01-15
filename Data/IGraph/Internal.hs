@@ -720,10 +720,10 @@ reverseGraphDirection (G g) = G g { graphNeiMode = reverse' (graphNeiMode g) }
   reverse' In  = Out
   reverse' _ = Out
 
-toDirected :: (IsUndirected u, E u a, E (ToDirected u) a) => Graph u a -> Graph (ToDirected u) a
+toDirected :: (IsUndirected u, E (ToDirected u) a) => Graph u a -> Graph (ToDirected u) a
 toDirected (G g) =
   G g { graphEdges = Set.map undirectedToDirected (graphEdges g) }
 
-toUndirected :: (IsDirected d, E d a, E (ToUndirected d) a) => Graph d a -> Graph (ToUndirected d) a
+toUndirected :: (IsDirected d, E (ToUndirected d) a) => Graph d a -> Graph (ToUndirected d) a
 toUndirected (G g) =
   G g { graphEdges = Set.map directedToUndirected (graphEdges g) }
